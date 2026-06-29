@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>简历分析｜AI 简历-JD 匹配工具</title>
+<style>
+:root {
+  --bg: #f5f5f7;
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-solid: #ffffff;
+  --surface-2: #f1f2f4;
+  --ink: #1d1d1f;
+  --text: #3f3f46;
+  --muted: #767680;
+  --line: rgba(29, 29, 31, 0.1);
+  --line-strong: rgba(29, 29, 31, 0.2);
+  --green: #087f5b;
+  --green-soft: #e9f7f1;
+  --blue: #0066cc;
+  --blue-soft: #eaf3ff;
+  --amber: #9a6a12;
+  --amber-soft: #fff7df;
+  --red: #b42318;
+  --red-soft: #fff1f0;
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.08);
+  --shadow-soft: 0 12px 35px rgba(0, 0, 0, 0.055);
+  --radius: 22px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(255,255,255,.95), rgba(255,255,255,0) 34%),
+    linear-gradient(180deg, #fbfbfd 0%, var(--bg) 42%, #ffffff 100%);
+  color: var(--ink);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+button, textarea, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .68; }
+a { color: inherit; }
+.shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 18px 0 80px; }
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  position: sticky;
+  top: 12px;
+  z-index: 10;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 8px 28px rgba(0,0,0,.05);
+}
+.brand { display: flex; align-items: center; gap: 12px; font-weight: 760; }
+.mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #111, #34343a);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: inset 0 1px rgba(255,255,255,.18);
+}
+.top-links { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ghost-link {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  transition: background .18s ease, border-color .18s ease;
+}
+.ghost-link:hover { background: #fff; border-color: var(--line); }
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+  gap: clamp(30px, 6vw, 86px);
+  align-items: center;
+  min-height: 560px;
+  padding: 54px 0 64px;
+}
+.eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: rgba(255,255,255,.78);
+  border: 1px solid var(--line);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 720;
+}
+.hero h1 {
+  max-width: 700px;
+  margin: 20px 0 0;
+  font-size: clamp(38px, 6vw, 66px);
+  line-height: 1.06;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+.hero p {
+  max-width: 640px;
+  margin: 24px 0 0;
+  color: var(--text);
+  font-size: clamp(16px, 1.7vw, 20px);
+}
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 32px; }
+.hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 34px;
+  max-width: 680px;
+}
+.metric {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.7);
+}
+.metric strong { display: block; font-size: 20px; line-height: 1.1; }
+.metric span { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; }
+.primary-btn, .secondary-btn, .plain-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  min-height: 44px;
+  font-weight: 720;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.primary-btn { background: var(--ink); color: #fff; box-shadow: 0 12px 25px rgba(29,29,31,.16); }
+.primary-btn:hover, .secondary-btn:hover, .plain-btn:hover { transform: translateY(-1px); }
+.secondary-btn { background: rgba(255,255,255,.84); border: 1px solid var(--line); color: var(--ink); }
+.plain-btn { background: var(--surface-2); color: var(--text); }
+.hero-card {
+  background: rgba(255,255,255,.78);
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+.hero-card h2 { margin: 0 0 18px; font-size: 22px; letter-spacing: 0; }
+.proof-list { display: grid; gap: 11px; }
+.proof-item {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(245,245,247,.82);
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 18px;
+}
+.proof-item strong { display: block; }
+.proof-item span { color: var(--muted); font-size: 13px; }
+.step-num {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: #fff;
+  color: var(--ink);
+  font-weight: 760;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
+  align-items: start;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 26px;
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px);
+}
+.panel h2, .panel h3 { margin: 0; line-height: 1.25; }
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.hint { color: var(--muted); font-size: 13px; margin-top: 7px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.field label { display: flex; justify-content: space-between; gap: 12px; font-weight: 720; margin-bottom: 8px; }
+.count { color: var(--muted); font-weight: 520; font-size: 12px; }
+textarea, input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255,255,255,.78);
+  color: var(--ink);
+  padding: 14px 15px;
+  outline: none;
+}
+textarea { min-height: 290px; resize: vertical; }
+textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 0 4px rgba(37,99,235,.08); }
+.key-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: rgba(245,245,247,.72);
+}
+.key-row input { background: #fff; }
+.status {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(241,242,244,.86);
+  color: var(--text);
+  font-size: 14px;
+}
+.status.error { background: var(--red-soft); color: var(--red); }
+.status.success { background: var(--green-soft); color: var(--green); }
+.progress { display: none; margin-top: 18px; }
+.progress.active { display: block; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.step {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 13px;
+  color: var(--muted);
+  background: rgba(255,255,255,.72);
+  font-size: 13px;
+}
+.step.active { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); font-weight: 720; }
+.step.done { border-color: var(--green); background: var(--green-soft); color: var(--green); font-weight: 720; }
+.results { display: none; margin-top: 22px; }
+.results.visible { display: block; }
+.score-card {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 24px;
+  align-items: center;
+  padding: 28px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255,255,255,.18), rgba(255,255,255,0) 32%),
+    linear-gradient(135deg, #1d1d1f, #303036 62%, #111113);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+.score-num { font-size: 72px; line-height: 1; letter-spacing: 0; font-weight: 820; }
+.score-card p { margin: 8px 0 0; color: rgba(255,255,255,.76); }
+.badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.16);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 720;
+}
+.result-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin-top: 16px; }
+.result-card {
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.84);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.045);
+}
+.result-card.wide { grid-column: 1 / -1; }
+.result-card h3 { margin-bottom: 12px; font-size: 16px; }
+.tag-list, .item-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.tag-list li {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #f4f5f7;
+  border: 1px solid rgba(29,29,31,.06);
+  color: var(--text);
+  font-size: 13px;
+}
+.item-list { display: grid; gap: 8px; }
+.item-list li {
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: #f4f5f7;
+  border: 1px solid rgba(29,29,31,.05);
+  color: var(--text);
+}
+.ops { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.feedback-box {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  background: rgba(255,255,255,.84);
+  box-shadow: 0 10px 28px rgba(0,0,0,.045);
+}
+.feedback-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.feedback-options button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 11px;
+}
+.feedback-options button.selected { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+.sidebar { display: grid; gap: 16px; position: sticky; top: 16px; }
+.history-list { display: grid; gap: 10px; }
+.empty {
+  padding: 20px;
+  border-radius: 18px;
+  background: rgba(241,242,244,.88);
+  color: var(--muted);
+  text-align: center;
+}
+.history-item {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 15px;
+  background: rgba(255,255,255,.76);
+  box-shadow: 0 8px 20px rgba(0,0,0,.035);
+}
+.history-item strong { display: block; }
+.history-item small { color: var(--muted); }
+.history-actions { display: flex; gap: 8px; margin-top: 10px; }
+.mini-btn {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.notice {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(255,247,223,.9);
+  border: 1px solid rgba(154,106,18,.12);
+  color: #765114;
+  font-size: 13px;
+}
+.capability-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 0;
+  list-style: none;
+}
+.capability-list li {
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: rgba(245,245,247,.82);
+  border: 1px solid rgba(255,255,255,.75);
+  color: var(--text);
+  font-size: 13px;
+}
+.capability-list strong { color: var(--ink); }
+.footer { margin-top: 42px; color: var(--muted); font-size: 13px; text-align: center; }
+@media (max-width: 900px) {
+  .hero, .grid, .form-grid, .score-card, .result-grid { grid-template-columns: 1fr; }
+  .hero { min-height: auto; padding-top: 18px; }
+  .sidebar { position: static; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  .hero-metrics { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .shell { width: min(100% - 22px, 1180px); padding-bottom: 48px; }
+  .topbar { align-items: flex-start; flex-direction: column; border-radius: 24px; }
+  .hero h1 { font-size: 42px; }
+  .hero-actions button, .hero-actions a, .key-row button, .ops button { width: 100%; }
+  .key-row { grid-template-columns: 1fr; }
+  textarea { min-height: 220px; }
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <nav class="topbar">
+    <div class="brand"><span class="mark">简</span><span>简历分析</span></div>
+    <div class="top-links">
+      <a class="ghost-link" href="#analyzer">开始分析</a>
+      <a class="ghost-link" href="#historyPanel">历史记录</a>
+      <a class="ghost-link" href="#resultPanel">分析结果</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div>
+      <span class="eyebrow">AI 求职辅助工具</span>
+      <h1>让每一次投递更有判断。</h1>
+      <p>粘贴简历和岗位 JD，快速生成匹配评分、短板提醒、关键词缺失和修改建议，帮助求职者在投递前形成更清晰的判断。</p>
+      <div class="hero-actions">
+        <button class="primary-btn" type="button" onclick="scrollToAnalyzer()">开始一次匹配分析</button>
+        <button class="secondary-btn" type="button" onclick="fillExample()">随机填入示例</button>
+      </div>
+      <div class="hero-metrics" aria-label="产品能力概览">
+        <div class="metric"><strong>3 步</strong><span>粘贴文本、生成分析、复用结果</span></div>
+        <div class="metric"><strong>8 类</strong><span>覆盖产品、运营、数据和智能硬件岗位示例</span></div>
+        <div class="metric"><strong>可复用</strong><span>历史记录、复制结果、Markdown 导出</span></div>
+      </div>
+    </div>
+    <aside class="hero-card">
+      <h2>产品流程</h2>
+      <div class="proof-list">
+        <div class="proof-item"><span class="step-num">1</span><div><strong>粘贴文本</strong><span>输入简历正文和岗位 JD，不依赖文件识别。</span></div></div>
+        <div class="proof-item"><span class="step-num">2</span><div><strong>AI 分析</strong><span>基于文本提取要求、匹配优势、缺失关键词。</span></div></div>
+        <div class="proof-item"><span class="step-num">3</span><div><strong>结果复用</strong><span>保存历史、复制结果、导出 Markdown。</span></div></div>
+      </div>
+      <ul class="capability-list">
+        <li><strong>能力边界：</strong>支持文本粘贴分析；不支持自动解析图片、截图或 PDF 简历。</li>
+        <li><strong>稳定演示：</strong>AI 服务不可用时自动使用示例结果兜底，保证展示流程不断。</li>
+      </ul>
+    </aside>
+  </section>
+
+  <section class="grid" id="analyzer">
+    <div>
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>岗位匹配分析</h2>
+            <p class="hint">请粘贴可复制的简历正文和目标岗位 JD。当前版本使用文本模型分析，不支持自动识别图片、截图或 PDF 文件。</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="fillExample()">填入示例</button>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="resumeInput">简历文本 <span class="count" id="resumeCount">0 字</span></label>
+            <textarea id="resumeInput" placeholder="粘贴你的简历文本。建议先从 PDF、Word 或网页简历中复制正文，再放到这里。内容可包含：教育背景、项目经历、实习经历、技能、证书、求职方向。"></textarea>
+          </div>
+          <div class="field">
+            <label for="jdInput">岗位 JD <span class="count" id="jdCount">0 字</span></label>
+            <textarea id="jdInput" placeholder="粘贴目标岗位 JD。建议包含：岗位职责、任职要求、加分项、业务方向。"></textarea>
+          </div>
+        </div>
+
+        <div class="key-row">
+          <input id="apiKeyInput" type="password" placeholder="可选：输入 DeepSeek 文本 API Key。留空则使用 Mock 兜底演示。">
+          <button class="plain-btn" type="button" onclick="saveApiKey()">保存 Key</button>
+        </div>
+        <p class="hint">安全提示：API Key 只建议在本地演示时输入，不要写进代码仓库或公开页面。</p>
+
+        <div class="ops">
+          <button class="primary-btn" id="analyzeBtn" type="button" onclick="runAnalyze()">开始分析</button>
+          <button class="secondary-btn" type="button" onclick="clearInputs()">清空输入</button>
+        </div>
+        <div class="status" id="statusBox">初始状态：请粘贴简历文本和岗位 JD，或使用示例数据开始体验。</div>
+        <div class="progress" id="progressBox">
+          <div class="steps">
+            <div class="step" id="step0">解析简历</div>
+            <div class="step" id="step1">提取岗位要求</div>
+            <div class="step" id="step2">匹配评分</div>
+            <div class="step" id="step3">生成建议</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="results" id="resultPanel">
+        <div id="resultContent"></div>
+      </section>
+    </div>
+
+    <aside class="sidebar">
+      <section class="panel" id="historyPanel">
+        <div class="panel-head">
+          <div>
+            <h3>历史记录</h3>
+            <p class="hint">每次分析后自动保存到当前浏览器。</p>
+          </div>
+          <button class="mini-btn" type="button" onclick="clearHistory()">清空</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </section>
+      <section class="notice">
+        AI 输出仅供求职准备参考。当前版本只分析用户粘贴的文本，不读取图片、截图或 PDF 文件；建议结合岗位真实要求、个人经历和人工判断进行二次修改。
+      </section>
+    </aside>
+  </section>
+
+  <p class="footer">简历分析 · AI 简历-JD 匹配工具 · 支持 GitHub Pages 部署</p>
+</main>
+
+<script>
+const STORAGE = {
+  apiKey: 'jian_gang_pei_api_key',
+  history: 'jian_gang_pei_history',
+  feedback: 'jian_gang_pei_feedback'
+};
+const API_URL = 'https://api.deepseek.com/chat/completions';
+const MODEL = 'deepseek-chat';
+
+let currentResult = null;
+let currentRecordId = null;
+let feedbackChoice = '';
+
+const $ = (id) => document.getElementById(id);
+const resumeInput = $('resumeInput');
+const jdInput = $('jdInput');
+const apiKeyInput = $('apiKeyInput');
+const statusBox = $('statusBox');
+const progressBox = $('progressBox');
+const resultPanel = $('resultPanel');
+const resultContent = $('resultContent');
+const analyzeBtn = $('analyzeBtn');
+
+const exampleCases = [
+{
+  title: '初级 AI 产品经理 / AI 产品助理',
+  resume: `张怡恒｜电子信息工程｜应届生
+求职方向：初级 AI 产品经理 / AI 产品助理
+
+教育背景：电子信息工程本科，学习过 Python、软件工程、计算机网络、嵌入式系统等课程。
+
+项目经历：
+1. AutoInsight AI：面向海外汽车商品企划岗位的 AI Agent，包含市场研究、竞品分析、用户画像、商品规划和结构化报告输出。
+2. ETF Agent：A 股 ETF 智能分析工具，支持 ETF 行情分析、均线信号、AI 技术分析报告和历史记录。
+3. 简历分析：简历与岗位 JD 匹配分析工具，设计了简历输入、岗位解析、匹配评分和修改建议流程。
+
+技能：Prompt 设计、AI Agent 流程设计、DeepSeek API、Streamlit、GitHub Pages、Figma、基础 Python。
+
+优势：能使用 GPT、Claude、Codex 等 AI 工具快速把业务想法做成可体验 Demo，理解 AI 产品从需求到上线的基本流程。`,
+  jd: `岗位名称：初级 AI 产品经理 / AI 产品助理
+
+岗位职责：
+1. 协助完成 AI 产品需求分析、竞品调研、用户流程设计和产品原型设计。
+2. 参与大模型应用场景探索，设计 Prompt 和 Agent 工作流。
+3. 跟进 AI 功能从 Demo 到上线的迭代过程，整理用户反馈和优化建议。
+4. 与研发、设计、业务团队沟通，推动功能落地。
+
+任职要求：
+1. 本科及以上学历，计算机、电子信息、产品、设计等相关背景优先。
+2. 熟悉 ChatGPT、Claude、DeepSeek 等大模型工具，有 AI 应用项目经验优先。
+3. 具备需求拆解、流程设计、产品文档和原型表达能力。
+4. 能够使用 Figma、Axure、Notion、GitHub Pages 等工具。
+5. 有较强学习能力和沟通表达能力。
+
+加分项：
+1. 有 AI Agent、Prompt 工程或大模型 API 调用经验。
+2. 有可在线体验的产品 Demo 或作品集。
+3. 能用数据和用户反馈驱动产品迭代。`
+},
+{
+  title: '数据产品助理',
+  resume: `李同学｜信息管理与信息系统｜应届生
+求职方向：数据产品助理 / BI 产品助理
+
+教育背景：本科期间学习数据库原理、统计学、Python 数据分析、产品设计基础。
+
+项目经历：
+1. 校园消费数据看板：整理食堂消费、用户分层和高峰时段数据，设计可视化看板和指标说明。
+2. 用户增长分析 Demo：用 Excel 和 Python 分析注册、活跃、留存数据，输出运营优化建议。
+3. 简历匹配工具体验优化：参与需求梳理，补充历史记录、导出和反馈入口。
+
+技能：SQL 基础、Excel 透视表、Python pandas、数据指标拆解、需求文档、Axure、Figma。
+
+优势：能把业务问题拆成指标和看板需求，理解数据产品需要兼顾口径、权限和业务解释。`,
+  jd: `岗位名称：数据产品助理
+
+岗位职责：
+1. 协助梳理业务数据需求，设计数据指标、报表和看板原型。
+2. 跟进数据埋点、数据口径确认和报表上线。
+3. 与运营、研发、数据分析团队沟通，推动数据产品迭代。
+4. 参与用户反馈收集，优化报表使用体验。
+
+任职要求：
+1. 本科及以上学历，信息管理、统计、计算机、产品相关专业优先。
+2. 熟悉 Excel、SQL 或 Python 数据分析工具。
+3. 具备基础产品思维，能输出需求文档和原型。
+4. 对数据指标、业务分析和可视化有兴趣。
+
+加分项：
+1. 有 BI 看板、数据分析或埋点项目经验。
+2. 能清楚解释指标口径和业务含义。
+3. 有 AI 工具辅助数据分析经验。`
+},
+{
+  title: '产品运营 / 用户运营',
+  resume: `王同学｜电子商务｜应届生
+求职方向：产品运营 / 用户运营
+
+教育背景：学习过用户运营、市场营销、消费者行为、数据分析基础。
+
+项目经历：
+1. 小红书内容增长实验：围绕 AI 学习工具做选题、标题、封面和评论反馈整理。
+2. 社群运营方案：设计新用户入群欢迎、使用教程、反馈收集和活跃激励流程。
+3. 求职工具体验测试：从用户视角记录输入、等待、结果理解和导出流程中的问题。
+
+技能：用户调研、内容运营、活动策划、Excel 数据整理、问卷设计、社群运营、基础产品体验分析。
+
+优势：理解用户从认知、试用到留存的完整路径，能把用户反馈转化为产品优化建议。`,
+  jd: `岗位名称：产品运营 / 用户运营
+
+岗位职责：
+1. 负责产品新用户引导、用户活跃、反馈收集和运营活动执行。
+2. 根据用户行为和反馈，提出产品体验优化建议。
+3. 撰写产品教程、活动文案和用户沟通内容。
+4. 跟进运营数据，定期复盘转化、留存和活跃情况。
+
+任职要求：
+1. 本科及以上学历，专业不限，有互联网产品或运营实践优先。
+2. 具备良好文案能力和用户同理心。
+3. 能使用 Excel、问卷、飞书或 Notion 进行数据和反馈整理。
+4. 对 AI 工具、效率工具或内容社区有兴趣。
+
+加分项：
+1. 有社群、内容账号或活动运营经验。
+2. 能从用户反馈中提炼产品需求。
+3. 有作品集或可展示项目。`
+},
+{
+  title: 'AIGC 内容运营',
+  resume: `陈同学｜新闻传播｜应届生
+求职方向：AIGC 内容运营 / AI 内容产品运营
+
+教育背景：新闻传播本科，学习过新媒体运营、内容策划、传播学和用户研究。
+
+项目经历：
+1. AIGC 图文选题库：用 AI 工具生成不同人群的内容选题，并人工筛选优化。
+2. AI 写作 Prompt 模板：整理标题、摘要、种草文、教程文等内容模板。
+3. 内容效果复盘：追踪阅读、收藏、评论和转化数据，输出选题优化建议。
+
+技能：内容策划、Prompt 编写、公众号/小红书运营、数据复盘、用户反馈整理、基础图片设计。
+
+优势：能结合 AI 提升内容初稿效率，同时保留人工审核和风格把控。`,
+  jd: `岗位名称：AIGC 内容运营
+
+岗位职责：
+1. 使用 AI 工具辅助生成内容初稿、选题、标题和脚本。
+2. 负责内容发布、数据跟踪、用户反馈收集和效果复盘。
+3. 维护 Prompt 模板库，提升内容生产效率。
+4. 与产品、设计和增长团队协作，优化内容转化路径。
+
+任职要求：
+1. 本科及以上学历，新闻传播、中文、广告、产品相关背景优先。
+2. 熟悉 ChatGPT、DeepSeek、豆包等 AI 内容工具。
+3. 具备内容判断力，能进行人工审核和二次编辑。
+4. 对 AI 内容产品和用户增长感兴趣。
+
+加分项：
+1. 有自媒体账号、内容作品或运营案例。
+2. 有 Prompt 模板沉淀经验。
+3. 能用数据复盘内容效果。`
+},
+{
+  title: 'AI 应用运营',
+  resume: `赵同学｜电子信息工程｜应届生
+求职方向：AI 应用运营 / AI 产品运营
+
+教育背景：电子信息工程本科，了解大模型工具、基础 Python 和产品迭代流程。
+
+项目经历：
+1. AI 工具体验报告：对比多个 AI 搜索、写作和代码工具，整理功能差异和用户痛点。
+2. AI Agent Demo 运营方案：设计新用户教程、FAQ、反馈表和使用案例。
+3. 求职分析工具测试：记录 DeepSeek API 失败、Mock 兜底和用户输入异常场景。
+
+技能：AI 工具测评、用户反馈整理、Prompt 调试、使用教程撰写、数据复盘、基础产品文档。
+
+优势：既能理解 AI 工具能力边界，也能从用户使用流程出发设计运营支持。`,
+  jd: `岗位名称：AI 应用运营
+
+岗位职责：
+1. 负责 AI 应用的新用户引导、使用教程、案例沉淀和反馈收集。
+2. 跟进用户使用问题，整理 FAQ 和产品优化建议。
+3. 协助测试 Prompt、模型输出和异常兜底体验。
+4. 结合使用数据和用户反馈，提升功能使用率和留存。
+
+任职要求：
+1. 熟悉常见 AI 工具，有较强学习能力。
+2. 能理解用户需求，输出清晰教程和运营内容。
+3. 具备基础数据分析能力，能进行问题归因和复盘。
+4. 沟通表达清楚，能和产品、研发协作。
+
+加分项：
+1. 有 AI 应用 Demo、Prompt 或 Agent 项目经验。
+2. 有用户反馈体系或帮助中心搭建经验。
+3. 有作品集或运营案例。`
+},
+{
+  title: 'ToB SaaS 产品助理',
+  resume: `刘同学｜软件工程｜应届生
+求职方向：ToB SaaS 产品助理
+
+教育背景：软件工程本科，学习过软件需求分析、数据库、Web 开发和项目管理。
+
+项目经历：
+1. 课程管理系统原型：设计教师端、学生端、课程发布和作业管理流程。
+2. CRM 需求拆解练习：梳理线索、客户、跟进记录和销售漏斗字段。
+3. AI 求职工具项目：参与输入校验、历史记录、导出和反馈模块设计。
+
+技能：需求文档、流程图、原型设计、数据库字段理解、用户角色拆解、基础前端。
+
+优势：能理解 ToB 场景中的角色、权限、流程和数据字段，适合从产品助理做起。`,
+  jd: `岗位名称：ToB SaaS 产品助理
+
+岗位职责：
+1. 协助完成企业客户需求调研、业务流程梳理和产品方案设计。
+2. 输出需求文档、流程图、原型和字段说明。
+3. 跟进研发实现、测试验收和客户反馈。
+4. 参与后台配置、权限、报表等模块优化。
+
+任职要求：
+1. 本科及以上学历，计算机、软件工程、信息管理相关专业优先。
+2. 理解 B 端业务流程，有较强逻辑表达能力。
+3. 能使用 Axure、Figma、飞书文档等工具。
+4. 有基础技术理解，能和研发沟通字段、接口和异常场景。
+
+加分项：
+1. 有 CRM、ERP、后台系统或 SaaS 产品项目经验。
+2. 能输出清晰 PRD 和流程图。
+3. 有客户访谈或需求分析实践。`
+},
+{
+  title: '数据分析助理',
+  resume: `孙同学｜统计学｜应届生
+求职方向：数据分析助理
+
+教育背景：统计学本科，学习过概率论、数理统计、回归分析、Python 和 SQL 基础。
+
+项目经历：
+1. 电商转化分析：分析浏览、加购、下单、支付漏斗，提出页面和活动优化建议。
+2. 用户留存分析：用 cohort 方法观察新用户留存变化，定位流失节点。
+3. 招聘 JD 分析：整理不同岗位关键词，分析能力要求差异。
+
+技能：Excel、SQL 基础、Python pandas、数据可视化、指标体系、分析报告撰写。
+
+优势：能把业务问题转化为指标拆解，并用结构化报告说明分析结论。`,
+  jd: `岗位名称：数据分析助理
+
+岗位职责：
+1. 根据业务需求提取、清洗和分析数据，输出分析报告。
+2. 跟踪用户增长、转化、留存和活动效果指标。
+3. 搭建基础报表，协助业务团队发现问题。
+4. 使用数据支持产品和运营决策。
+
+任职要求：
+1. 统计、数学、计算机、信息管理等相关专业优先。
+2. 熟悉 Excel，了解 SQL 或 Python。
+3. 具备较强逻辑能力和报告表达能力。
+4. 对互联网产品和用户行为分析感兴趣。
+
+加分项：
+1. 有完整数据分析项目或可视化作品。
+2. 能解释指标口径和业务意义。
+3. 有 AI 工具辅助分析经验。`
+},
+{
+  title: '智能硬件产品助理',
+  resume: `周同学｜电子信息工程｜应届生
+求职方向：智能硬件产品助理
+
+教育背景：电子信息工程本科，学习过嵌入式系统、传感器、通信原理和产品设计基础。
+
+项目经历：
+1. 智能台灯方案：梳理用户场景、亮度调节、定时和传感器触发逻辑。
+2. 设备 App 原型：设计设备绑定、状态查看、异常提醒和固件升级流程。
+3. AI 语音助手体验分析：整理语音交互失败场景和提示文案优化建议。
+
+技能：硬件基础理解、用户场景拆解、原型设计、需求文档、测试用例、基础嵌入式知识。
+
+优势：有电子信息背景，能理解硬件约束，同时能从用户场景出发做产品方案。`,
+  jd: `岗位名称：智能硬件产品助理
+
+岗位职责：
+1. 协助完成智能硬件产品需求分析、功能定义和原型设计。
+2. 跟进设备端、App 端和云端功能联调。
+3. 收集用户反馈，优化设备绑定、控制、提醒和售后体验。
+4. 编写需求文档、测试用例和版本记录。
+
+任职要求：
+1. 电子信息、自动化、通信、计算机等相关专业优先。
+2. 理解基础硬件原理和软件产品流程。
+3. 能清楚表达用户场景、功能逻辑和异常流程。
+4. 对 IoT、智能家居或 AI 硬件感兴趣。
+
+加分项：
+1. 有嵌入式、传感器或智能设备项目经历。
+2. 能使用 Figma 或 Axure 设计 App 原型。
+3. 有用户反馈和测试问题跟踪经验。`
+}
+];
+
+init();
+function init() {
+  apiKeyInput.value = localStorage.getItem(STORAGE.apiKey) || '';
+  resumeInput.addEventListener('input', updateCounts);
+  jdInput.addEventListener('input', updateCounts);
+  renderHistory();
+  updateCounts();
+}
+function updateCounts() {
+  $('resumeCount').textContent = `${resumeInput.value.length} 字`;
+  $('jdCount').textContent = `${jdInput.value.length} 字`;
+}
+function scrollToAnalyzer() {
+  $('analyzer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function setStatus(text, type = '') {
+  statusBox.textContent = text;
+  statusBox.className = `status ${type}`.trim();
+}
+function saveApiKey() {
+  const key = apiKeyInput.value.trim();
+  if (!key) {
+    localStorage.removeItem(STORAGE.apiKey);
+    setStatus('已清空当前浏览器中的 DeepSeek API Key。留空时会使用 Mock 分析结果兜底。');
+    return;
+  }
+  localStorage.setItem(STORAGE.apiKey, key);
+  setStatus('DeepSeek API Key 已保存到当前浏览器本地，不会写入代码仓库。', 'success');
+}
+function fillExample() {
+  const example = exampleCases[Math.floor(Math.random() * exampleCases.length)];
+  resumeInput.value = example.resume;
+  jdInput.value = example.jd;
+  updateCounts();
+  setStatus(`已填入「${example.title}」示例。你可以直接分析，也可以先替换成自己的内容。`, 'success');
+  scrollToAnalyzer();
+}
+function clearInputs() {
+  resumeInput.value = '';
+  jdInput.value = '';
+  updateCounts();
+  resultPanel.classList.remove('visible');
+  setStatus('已清空输入。请重新粘贴简历文本和岗位 JD。');
+}
+function setStep(index) {
+  progressBox.classList.add('active');
+  for (let i = 0; i < 4; i++) {
+    const el = $(`step${i}`);
+    el.className = 'step';
+    if (i < index) el.classList.add('done');
+    if (i === index) el.classList.add('active');
+  }
+}
+function finishSteps() {
+  for (let i = 0; i < 4; i++) $(`step${i}`).className = 'step done';
+}
+function validateInput() {
+  if (resumeInput.value.trim().length < 40) return '请粘贴更完整的简历内容，至少包含教育背景、项目或技能。';
+  if (jdInput.value.trim().length < 40) return '请粘贴更完整的岗位 JD，至少包含职责和任职要求。';
+  return '';
+}
+async function runAnalyze() {
+  const error = validateInput();
+  if (error) {
+    setStatus(error, 'error');
+    return;
+  }
+  analyzeBtn.disabled = true;
+  resultPanel.classList.remove('visible');
+  setStatus('分析中：DeepSeek 文本 Agent 正在提取岗位要求并匹配简历信息。');
+  try {
+    setStep(0);
+    await wait(450);
+    setStep(1);
+    await wait(450);
+    setStep(2);
+    const result = await analyzeWithFallback(resumeInput.value.trim(), jdInput.value.trim());
+    setStep(3);
+    await wait(350);
+    finishSteps();
+    currentResult = normalizeResult(result);
+    currentRecordId = saveHistory(currentResult);
+    renderResult(currentResult);
+    renderHistory();
+    setStatus(currentResult.meta.mock ? 'DeepSeek API 不可用或未配置 Key，已使用 Mock 结果完成演示。' : '分析完成，结果已保存到历史记录。', currentResult.meta.mock ? '' : 'success');
+  } catch (err) {
+    const fallback = createMockResult(resumeInput.value.trim(), jdInput.value.trim(), 'API 异常后 Mock 兜底');
+    currentResult = fallback;
+    currentRecordId = saveHistory(fallback);
+    renderResult(fallback);
+    renderHistory();
+    setStatus(`分析失败，已启用 Mock 兜底：${err.message || '未知错误'}`, 'error');
+  } finally {
+    analyzeBtn.disabled = false;
+  }
+}
+async function analyzeWithFallback(resumeText, jdText) {
+  const key = apiKeyInput.value.trim() || localStorage.getItem(STORAGE.apiKey) || '';
+  if (!key) return createMockResult(resumeText, jdText, '未配置 DeepSeek API Key');
+  try {
+    return await callDeepSeek(resumeText, jdText, key);
+  } catch (err) {
+    console.warn('DeepSeek failed, fallback to mock:', err);
+    return createMockResult(resumeText, jdText, err.message || 'API 调用失败');
+  }
+}
+async function callDeepSeek(resumeText, jdText, key) {
+  const prompt = `你是一个基于 DeepSeek 文本模型的求职匹配分析 Agent。请只基于用户粘贴的简历文本和岗位 JD 文本进行分析，输出严格 JSON，不要 Markdown。
+
+JSON 字段：
+{
+  "jobTitle": "岗位名称",
+  "score": 0-100,
+  "summary": "一句话摘要",
+  "coreRequirements": ["岗位核心要求"],
+  "strengths": ["简历匹配优势"],
+  "weaknesses": ["简历明显短板"],
+  "missingKeywords": ["缺失关键词"],
+  "resumeSuggestions": ["简历修改建议"],
+  "interviewQuestions": ["面试可能被问的问题"],
+  "hrMessage": "给 HR 的打招呼话术",
+  "nextActions": ["下一步行动建议"]
+}
+
+要求：
+1. 不要假设你读取了图片、PDF、附件或网页内容。
+2. 如果简历或 JD 信息不足，请明确提示需要用户补充文本。
+3. 不要夸大结果；保留人工复核空间；建议具体可执行。
+
+【简历文本】
+${resumeText}
+
+【岗位 JD 文本】
+${jdText}`;
+  const resp = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: '你是资深 HR 和 AI 产品经理教练，只能分析用户提供的文本，只返回严格 JSON。' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.25,
+      max_tokens: 2600
+    })
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content || '';
+  return JSON.parse(stripCodeFence(content));
+}
+function stripCodeFence(text) {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return (match ? match[1] : text).trim();
+}
+function normalizeResult(result) {
+  return {
+    jobTitle: result.jobTitle || '目标岗位',
+    score: clamp(Number(result.score) || 72, 0, 100),
+    summary: result.summary || '已生成结构化匹配分析，请结合个人情况人工复核。',
+    coreRequirements: arr(result.coreRequirements),
+    strengths: arr(result.strengths),
+    weaknesses: arr(result.weaknesses),
+    missingKeywords: arr(result.missingKeywords),
+    resumeSuggestions: arr(result.resumeSuggestions),
+    interviewQuestions: arr(result.interviewQuestions),
+    hrMessage: result.hrMessage || '您好，我对贵公司的岗位很感兴趣。我的项目经历与岗位要求有一定匹配，希望有机会进一步沟通。',
+    nextActions: arr(result.nextActions),
+    meta: result.meta || { mock: false }
+  };
+}
+function createMockResult(resumeText, jdText, reason) {
+  const jobTitle = extractJobTitle(jdText);
+  const score = scoreByKeywords(resumeText, jdText);
+  return normalizeResult({
+    jobTitle,
+    score,
+    summary: `当前简历与「${jobTitle}」存在一定匹配度，优势在 AI 工具实践和项目落地，短板在岗位关键词覆盖和产品方法表达。`,
+    coreRequirements: ['AI 产品需求拆解', 'Prompt / Agent 流程设计', '产品原型与文档表达', '跨团队沟通', '用户反馈与迭代意识'],
+    strengths: ['有多个可在线体验的 AI 产品 Demo，能证明从想法到上线的执行力。', '项目覆盖 Agent、DeepSeek 文本 API、数据可视化和 GitHub Pages 部署，和 AI 产品助理岗位相关。', '电子信息工程背景能支撑基础技术理解，适合初级 AI 产品岗位。'],
+    weaknesses: ['简历需要更明确写出每个项目中的用户痛点、功能方案和个人职责。', '如果 JD 强调正式产品实习经历，当前经历需要用项目闭环来补强。', '部分技能描述偏工具罗列，需要转化成产品能力表达。'],
+    missingKeywords: ['需求文档', '用户画像', '竞品分析', '数据埋点', 'A/B 测试', 'PRD', '用户反馈'],
+    resumeSuggestions: ['每个项目补充“目标用户、核心痛点、AI 如何参与、结果如何验证”。', '把“会使用 Claude/Codex”改写为“使用 AI 工具完成需求拆解、原型开发和功能迭代”。', '增加 1-2 条量化结果，例如页面上线、用户试用、分析记录、反馈收集。'],
+    interviewQuestions: ['你为什么选择做这个岗位匹配工具？', '如果 API 输出不稳定，你会如何设计兜底策略？', '你如何判断一个 AI 产品功能是否真的解决用户问题？', '你的项目从 Demo 升级到 MVP 还缺什么？'],
+    hrMessage: `您好，我关注到贵公司的${jobTitle}岗位。我有多个 AI 产品 Demo 经验，熟悉 Prompt 设计、Agent 流程和原型落地，也能用产品视角整理用户痛点和迭代方案。希望有机会进一步沟通。`,
+    nextActions: ['先按 JD 补齐缺失关键词，但不要虚构经历。', '把最相关的 2 个项目放到简历最前面。', '准备 3 分钟项目讲述：用户痛点、方案、AI 角色、结果、下一步。'],
+    meta: { mock: true, reason }
+  });
+}
+function extractJobTitle(jdText) {
+  const line = jdText.split(/\n/).find(v => /岗位|职位|名称/.test(v));
+  if (!line) return '初级 AI 产品经理';
+  return line.replace(/岗位名称|职位名称|岗位|职位|[:：]/g, '').trim().slice(0, 24) || '初级 AI 产品经理';
+}
+function scoreByKeywords(resumeText, jdText) {
+  const words = ['AI', '产品', 'Agent', 'Prompt', 'DeepSeek', '需求', '原型', '用户', '数据', '反馈', '项目'];
+  const hits = words.filter(w => resumeText.includes(w) && jdText.includes(w)).length;
+  return clamp(58 + hits * 4, 56, 88);
+}
+function renderResult(result) {
+  const level = result.score >= 80 ? '匹配度较高' : result.score >= 65 ? '具备投递基础' : '需要重点补强';
+  resultContent.innerHTML = `
+    <div class="score-card">
+      <div>
+        <div class="score-num">${result.score}</div>
+        <div>匹配评分 / 100</div>
+      </div>
+      <div>
+        <span class="badge">${level}</span>
+        <h2>${escapeHtml(result.jobTitle)}</h2>
+        <p>${escapeHtml(result.summary)}</p>
+        <p>分析依据来自你粘贴的简历文本和岗位 JD，不包含图片、PDF 或附件内容。</p>
+      </div>
+    </div>
+    <div class="ops">
+      <button class="secondary-btn" type="button" onclick="copyMarkdown()">复制分析结果</button>
+      <button class="secondary-btn" type="button" onclick="downloadMarkdown()">导出 Markdown</button>
+      <button class="plain-btn" type="button" onclick="runAnalyze()">重新生成</button>
+    </div>
+    <div class="result-grid">
+      ${renderCard('岗位核心要求', result.coreRequirements, 'tag')}
+      ${renderCard('关键词缺失提醒', result.missingKeywords, 'tag')}
+      ${renderCard('简历匹配优势', result.strengths)}
+      ${renderCard('简历明显短板', result.weaknesses)}
+      ${renderCard('简历修改建议', result.resumeSuggestions, 'list', true)}
+      ${renderCard('面试可能被问的问题', result.interviewQuestions)}
+      <div class="result-card wide"><h3>HR 打招呼话术建议</h3><p>${escapeHtml(result.hrMessage)}</p></div>
+      ${renderCard('下一步行动建议', result.nextActions, 'list', true)}
+    </div>
+    <div class="feedback-box">
+      <h3>结果反馈</h3>
+      <p class="hint">这个入口用于后续 Beta 化反馈收集，目前先保存到当前浏览器。反馈不会上传到服务器。</p>
+      <div class="feedback-options">
+        <button type="button" onclick="selectFeedback('有帮助', this)">有帮助</button>
+        <button type="button" onclick="selectFeedback('一般', this)">一般</button>
+        <button type="button" onclick="selectFeedback('不准确', this)">不准确</button>
+      </div>
+      <input id="feedbackText" placeholder="可选：用一句话说明哪里有帮助或哪里不准确">
+      <div class="ops"><button class="primary-btn" type="button" onclick="submitFeedback()">提交反馈</button></div>
+    </div>
+  `;
+  resultPanel.classList.add('visible');
+  resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function renderCard(title, items, mode = 'list', wide = false) {
+  const listClass = mode === 'tag' ? 'tag-list' : 'item-list';
+  const safeItems = items.length ? items : ['暂无明显信息，建议补充更完整内容后重新分析。'];
+  return `<div class="result-card ${wide ? 'wide' : ''}"><h3>${title}</h3><ul class="${listClass}">${safeItems.map(v => `<li>${escapeHtml(v)}</li>`).join('')}</ul></div>`;
+}
+function saveHistory(result) {
+  const records = getHistory();
+  const id = String(Date.now());
+  records.unshift({
+    id,
+    jobTitle: result.jobTitle,
+    createdAt: new Date().toLocaleString(),
+    score: result.score,
+    summary: result.summary,
+    result,
+    resumeText: resumeInput.value.trim(),
+    jdText: jdInput.value.trim()
+  });
+  localStorage.setItem(STORAGE.history, JSON.stringify(records.slice(0, 20)));
+  return id;
+}
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE.history) || '[]'); }
+  catch { return []; }
+}
+function renderHistory() {
+  const records = getHistory();
+  const box = $('historyList');
+  if (!records.length) {
+    box.innerHTML = '<div class="empty">暂无历史记录。完成一次分析后会自动保存。</div>';
+    return;
+  }
+  box.innerHTML = records.map(r => `
+    <div class="history-item">
+      <strong>${escapeHtml(r.jobTitle)} · ${r.score}分</strong>
+      <small>${escapeHtml(r.createdAt)}</small>
+      <p class="hint">${escapeHtml(r.summary)}</p>
+      <div class="history-actions">
+        <button class="mini-btn" type="button" onclick="loadHistory('${r.id}')">查看</button>
+        <button class="mini-btn" type="button" onclick="deleteHistory('${r.id}')">删除</button>
+      </div>
+    </div>`).join('');
+}
+function loadHistory(id) {
+  const record = getHistory().find(r => r.id === id);
+  if (!record) return;
+  currentResult = record.result;
+  currentRecordId = id;
+  renderResult(record.result);
+  setStatus('已打开历史分析记录。你可以复制、导出或基于当前输入重新分析。', 'success');
+}
+function deleteHistory(id) {
+  const records = getHistory().filter(r => r.id !== id);
+  localStorage.setItem(STORAGE.history, JSON.stringify(records));
+  renderHistory();
+}
+function clearHistory() {
+  localStorage.removeItem(STORAGE.history);
+  renderHistory();
+  setStatus('历史记录已清空。');
+}
+function selectFeedback(value, btn) {
+  feedbackChoice = value;
+  document.querySelectorAll('.feedback-options button').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+function submitFeedback() {
+  if (!currentResult) return setStatus('请先完成一次分析，再提交反馈。', 'error');
+  if (!feedbackChoice) return setStatus('请选择“有帮助 / 一般 / 不准确”中的一项。', 'error');
+  const records = getFeedback();
+  records.unshift({
+    id: String(Date.now()),
+    historyId: currentRecordId,
+    rating: feedbackChoice,
+    comment: $('feedbackText')?.value.trim() || '',
+    createdAt: new Date().toLocaleString()
+  });
+  localStorage.setItem(STORAGE.feedback, JSON.stringify(records.slice(0, 50)));
+  setStatus('反馈已保存到当前浏览器。后续可以升级为数据库或表单收集。', 'success');
+}
+function getFeedback() {
+  try { return JSON.parse(localStorage.getItem(STORAGE.feedback) || '[]'); }
+  catch { return []; }
+}
+function buildMarkdown(result = currentResult) {
+  if (!result) return '';
+  const lines = [
+    `# 简历分析结果：${result.jobTitle}`,
+    '',
+    `- 匹配评分：${result.score}/100`,
+    `- 摘要：${result.summary}`,
+    `- 生成时间：${new Date().toLocaleString()}`,
+    '',
+    sectionMd('岗位核心要求', result.coreRequirements),
+    sectionMd('简历匹配优势', result.strengths),
+    sectionMd('简历明显短板', result.weaknesses),
+    sectionMd('关键词缺失提醒', result.missingKeywords),
+    sectionMd('简历修改建议', result.resumeSuggestions),
+    sectionMd('面试可能被问的问题', result.interviewQuestions),
+    `## HR 打招呼话术建议\n\n${result.hrMessage}`,
+    '',
+    sectionMd('下一步行动建议', result.nextActions),
+    '---',
+    '说明：AI 输出仅供参考，需要结合个人真实经历人工复核。本结果只基于用户粘贴的文本，不包含图片、PDF 或附件解析。'
+  ];
+  return lines.join('\n');
+}
+function sectionMd(title, items) {
+  return `## ${title}\n\n${items.map(v => `- ${v}`).join('\n')}\n`;
+}
+async function copyMarkdown() {
+  if (!currentResult) return;
+  const text = buildMarkdown();
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      fallbackCopy(text);
+    }
+    setStatus('分析结果已复制，可粘贴到文档或简历修改稿中。', 'success');
+  } catch (err) {
+    fallbackCopy(text);
+    setStatus('已使用兼容模式复制分析结果。', 'success');
+  }
+}
+function fallbackCopy(text) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  area.remove();
+}
+function downloadMarkdown() {
+  if (!currentResult) return;
+  const blob = new Blob([buildMarkdown()], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `简历分析-${currentResult.jobTitle}-${Date.now()}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function arr(value) {
+  return Array.isArray(value) ? value.filter(Boolean).map(String) : [];
+}
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+function escapeHtml(text) {
+  return String(text ?? '').replace(/[&<>"']/g, s => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[s]));
+}
+</script>
+</body>
+</html>
