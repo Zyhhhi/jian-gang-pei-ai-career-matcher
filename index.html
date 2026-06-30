@@ -969,31 +969,189 @@ function normalizeResult(result) {
 }
 function createMockResult(resumeText, jdText, reason) {
   const jobTitle = extractJobTitle(jdText);
-  const score = scoreByKeywords(resumeText, jdText);
+  const profile = buildLocalAnalysisProfile(resumeText, jdText);
+  const score = scoreByKeywords(resumeText, jdText, profile);
   return normalizeResult({
     jobTitle,
     score,
-    summary: `当前简历与「${jobTitle}」存在一定匹配度，优势在 AI 工具实践和项目落地，短板在岗位关键词覆盖和产品方法表达。`,
-    coreRequirements: ['AI 产品需求拆解', 'Prompt / Agent 流程设计', '产品原型与文档表达', '跨团队沟通', '用户反馈与迭代意识'],
-    strengths: ['有多个可在线体验的 AI 产品 Demo，能证明从想法到上线的执行力。', '项目覆盖 Agent、DeepSeek 文本 API、数据可视化和 GitHub Pages 部署，和 AI 产品助理岗位相关。', '电子信息工程背景能支撑基础技术理解，适合初级 AI 产品岗位。'],
-    weaknesses: ['简历需要更明确写出每个项目中的用户痛点、功能方案和个人职责。', '如果 JD 强调正式产品实习经历，当前经历需要用项目闭环来补强。', '部分技能描述偏工具罗列，需要转化成产品能力表达。'],
-    missingKeywords: ['需求文档', '用户画像', '竞品分析', '数据埋点', 'A/B 测试', 'PRD', '用户反馈'],
-    resumeSuggestions: ['每个项目补充“目标用户、核心痛点、AI 如何参与、结果如何验证”。', '把“会使用 Claude/Codex”改写为“使用 AI 工具完成需求拆解、原型开发和功能迭代”。', '增加 1-2 条量化结果，例如页面上线、用户试用、分析记录、反馈收集。'],
-    interviewQuestions: ['你为什么选择做这个岗位匹配工具？', '如果 API 输出不稳定，你会如何设计兜底策略？', '你如何判断一个 AI 产品功能是否真的解决用户问题？', '你的项目从 Demo 升级到 MVP 还缺什么？'],
-    hrMessage: `您好，我关注到贵公司的${jobTitle}岗位。我有多个 AI 产品 Demo 经验，熟悉 Prompt 设计、Agent 流程和原型落地，也能用产品视角整理用户痛点和迭代方案。希望有机会进一步沟通。`,
-    nextActions: ['先按 JD 补齐缺失关键词，但不要虚构经历。', '把最相关的 2 个项目放到简历最前面。', '准备 3 分钟项目讲述：用户痛点、方案、AI 角色、结果、下一步。'],
+    summary: `当前简历与「${jobTitle}」的匹配度为 ${score} 分。${profile.summary}`,
+    coreRequirements: profile.coreRequirements,
+    strengths: profile.strengths,
+    weaknesses: profile.weaknesses,
+    missingKeywords: profile.missingKeywords,
+    resumeSuggestions: profile.resumeSuggestions,
+    interviewQuestions: profile.interviewQuestions,
+    hrMessage: buildHrMessage(jobTitle, profile),
+    nextActions: profile.nextActions,
     meta: { mock: true, reason }
   });
+}
+function buildLocalAnalysisProfile(resumeText, jdText) {
+  const resume = normalizeText(resumeText);
+  const jd = normalizeText(jdText);
+  const jdNeeds = KEYWORD_GROUPS.filter(group => hasAny(jd, group.words));
+  const matched = jdNeeds.filter(group => hasAny(resume, group.words));
+  const missing = jdNeeds.filter(group => !hasAny(resume, group.words));
+  const extraStrengths = KEYWORD_GROUPS.filter(group => !jdNeeds.includes(group) && hasAny(resume, group.words));
+  const coreRequirements = uniqueList([
+    ...jdNeeds.map(group => group.requirement),
+    '岗位信息拆解与结构化表达',
+    '结果复核与持续迭代意识'
+  ]).slice(0, 6);
+  const strengths = uniqueList([
+    ...matched.map(group => group.strength),
+    ...extraStrengths.slice(0, 2).map(group => group.extraStrength),
+    inferProjectStrength(resume),
+    inferEducationStrength(resume)
+  ]).filter(Boolean).slice(0, 5);
+  const weaknesses = uniqueList([
+    ...missing.map(group => group.weakness),
+    ...inferExperienceWeaknesses(resume, jd)
+  ]).filter(Boolean).slice(0, 5);
+  const missingKeywords = uniqueList(missing.flatMap(group => group.displayKeywords)).slice(0, 8);
+  const resumeSuggestions = uniqueList([
+    ...missing.map(group => group.suggestion),
+    '每个项目建议按“用户场景-痛点-方案-AI 角色-结果-下一步”重写，避免只罗列工具。',
+    '把最贴近 JD 的 2 个项目前置，并补充可验证结果，例如上线链接、用户反馈、分析记录或迭代版本。'
+  ]).slice(0, 5);
+  return {
+    summary: buildSummary(matched, missing),
+    coreRequirements,
+    strengths: strengths.length ? strengths : ['简历已有项目或技能信息，可作为投递初稿；建议继续补充与 JD 直接相关的结果证据。'],
+    weaknesses: weaknesses.length ? weaknesses : ['当前 JD 中的核心要求覆盖较充分，建议进一步补充量化结果和真实用户反馈，提升可信度。'],
+    missingKeywords: missingKeywords.length ? missingKeywords : ['暂无明显缺失关键词，建议人工复核 JD 中的高频能力要求。'],
+    resumeSuggestions,
+    interviewQuestions: buildInterviewQuestions(jdNeeds, missing),
+    nextActions: buildNextActions(missing)
+  };
+}
+const KEYWORD_GROUPS = [
+  {
+    words: ['prd', '需求文档', '产品文档', '需求分析', '需求拆解', '功能设计'],
+    requirement: '需求拆解与 PRD / 产品文档表达',
+    strength: '简历中已体现需求拆解或产品文档能力，能回应岗位对产品基本功的要求。',
+    extraStrength: '具备需求拆解意识，可支撑初级产品岗位的方案梳理工作。',
+    weakness: 'JD 关注需求分析或 PRD，但简历中这类产出证据不够明显。',
+    suggestion: '补充 1 个项目的 PRD、功能清单或需求拆解过程，说明你如何从用户痛点推导功能方案。',
+    displayKeywords: ['需求分析', 'PRD', '功能设计']
+  },
+  {
+    words: ['prompt', '提示词', 'agent', '智能体', '工作流', 'deepseek', '大模型', 'llm'],
+    requirement: 'Prompt 设计与 AI Agent 工作流理解',
+    strength: '简历中出现 Prompt、Agent 或大模型工具实践，和 AI 产品岗位相关度较高。',
+    extraStrength: '具备 AI 工具实践经验，能把想法快速落到可体验原型。',
+    weakness: 'JD 强调 AI / Agent 能力，但简历中 AI 角色、Prompt 方案或工作流描述还不够具体。',
+    suggestion: '把 AI 项目写成“输入-模型处理-结构化输出-人工复核-兜底机制”的流程，而不是只写使用了某个工具。',
+    displayKeywords: ['Prompt', 'Agent', '大模型工作流']
+  },
+  {
+    words: ['原型', 'figma', 'axure', '交互', '页面', '体验', '用户体验'],
+    requirement: '产品原型与交互体验设计',
+    strength: '简历中有原型、页面或体验优化经历，能支撑产品助理的原型表达要求。',
+    extraStrength: '具备将需求转化为可体验页面的能力，适合展示 MVP 落地意识。',
+    weakness: 'JD 提到原型或交互体验，但简历缺少具体页面、流程或体验优化说明。',
+    suggestion: '补充核心页面截图、用户操作路径和关键状态设计，例如空状态、加载中、失败提示和结果页。',
+    displayKeywords: ['原型设计', '交互流程', '用户体验']
+  },
+  {
+    words: ['数据', '指标', '埋点', '转化', '留存', '漏斗', 'ab测试', 'a/b'],
+    requirement: '数据指标意识与效果评估',
+    strength: '简历中包含数据分析、指标或可视化经历，能回应岗位对效果评估的要求。',
+    extraStrength: '具备基础数据分析意识，适合参与产品效果复盘。',
+    weakness: 'JD 关注数据指标，但简历缺少指标设计、效果评估或数据复盘证据。',
+    suggestion: '为项目补充 1-2 个指标，例如使用次数、分析完成率、反馈数量、导出次数或用户满意度。',
+    displayKeywords: ['数据指标', '埋点', '效果评估']
+  },
+  {
+    words: ['竞品', '市场', '调研', '用户画像', '用户研究', '访谈', '反馈'],
+    requirement: '用户研究、竞品分析与反馈迭代',
+    strength: '简历中已有用户反馈、调研或竞品分析内容，能体现从用户场景出发的产品意识。',
+    extraStrength: '有用户视角和反馈意识，能把项目从一次性演示推进到迭代。',
+    weakness: 'JD 强调用户研究或竞品分析，但简历中用户画像、调研方法和反馈结论不够清晰。',
+    suggestion: '补充目标用户、使用场景、反馈来源和你基于反馈做出的 1 次迭代。',
+    displayKeywords: ['用户画像', '竞品分析', '用户反馈']
+  },
+  {
+    words: ['b端', 'b 端', '企业', '客户', '业务方', '协作', '跨部门', '沟通'],
+    requirement: '业务协作与 B 端场景理解',
+    strength: '简历中体现业务沟通或协作经历，能支撑产品助理在跨角色场景下推进需求。',
+    extraStrength: '具备把业务问题拆成产品方案的意识。',
+    weakness: 'JD 偏 B 端或业务协作，但简历中业务方、客户场景和协作过程描述不足。',
+    suggestion: '增加“和谁协作、对齐了什么需求、如何处理分歧、最终交付什么”的项目描述。',
+    displayKeywords: ['B 端场景', '跨部门协作', '业务沟通']
+  },
+  {
+    words: ['上线', '部署', 'github pages', '小程序', 'streamlit', '可体验', 'mvp', 'beta'],
+    requirement: 'MVP 落地与可体验交付',
+    strength: '简历中有上线、部署或可体验产品经历，能证明不只停留在想法和文档。',
+    extraStrength: '有可验证的上线链接或 MVP 交付经历，作品集可信度较强。',
+    weakness: 'JD 关注项目落地，但简历中上线状态、可体验入口或交付结果不够突出。',
+    suggestion: '在项目标题后标注“已上线 / MVP / 可体验”，并放出链接、核心流程和当前版本边界。',
+    displayKeywords: ['MVP', '已上线', '可体验产品']
+  }
+];
+function normalizeText(text) {
+  return String(text || '').toLowerCase().replace(/\s+/g, ' ');
+}
+function hasAny(text, words) {
+  return words.some(word => text.includes(word.toLowerCase()));
+}
+function uniqueList(items) {
+  return [...new Set(items.filter(Boolean))];
+}
+function buildSummary(matched, missing) {
+  if (matched.length >= 4 && missing.length <= 1) return '优势能力覆盖较多，适合投递；建议进一步补充量化结果和人工复核边界。';
+  if (matched.length >= 2) return '具备投递基础，但仍需围绕 JD 中未覆盖的能力补充项目证据。';
+  return '当前简历与 JD 的直接匹配证据偏少，建议先补充与岗位要求最相关的项目描述。';
+}
+function inferProjectStrength(resume) {
+  if (hasAny(resume, ['项目', '作品集', 'github', '上线', '小程序', 'streamlit'])) return '简历中有项目或作品集线索，适合用项目闭环证明产品落地能力。';
+  return '';
+}
+function inferEducationStrength(resume) {
+  if (hasAny(resume, ['电子信息', '计算机', '软件', '通信', 'python'])) return '技术或工程背景有助于理解 AI 产品实现边界，适合初级 AI 产品岗位。';
+  return '';
+}
+function inferExperienceWeaknesses(resume, jd) {
+  const list = [];
+  if (hasAny(jd, ['实习', '工作经验']) && !hasAny(resume, ['实习', '工作经历', '产品助理'])) {
+    list.push('JD 提到实习或工作经验，简历需要用项目闭环、上线结果和反馈记录来替代证明。');
+  }
+  if (!hasAny(resume, ['负责', '主导', '我', '本人'])) {
+    list.push('简历中个人职责不够突出，建议明确你在每个项目中负责的具体环节。');
+  }
+  return list;
+}
+function buildInterviewQuestions(jdNeeds, missing) {
+  return uniqueList([
+    `你如何判断自己和这个岗位的匹配度？`,
+    ...jdNeeds.slice(0, 2).map(group => `请讲一个能体现「${group.requirement}」的项目。`),
+    ...missing.slice(0, 2).map(group => `如果岗位需要「${group.requirement}」，你目前准备如何补强？`),
+    '如果 AI 输出不稳定，你会如何设计兜底和人工复核机制？'
+  ]).slice(0, 5);
+}
+function buildNextActions(missing) {
+  return uniqueList([
+    ...missing.slice(0, 3).map(group => `优先补充「${group.displayKeywords[0]}」相关证据，不要虚构经历。`),
+    '把最匹配 JD 的项目放在简历前半部分，并增加上线链接或结果截图。',
+    '准备 3 分钟项目讲述：用户是谁、痛点是什么、AI 怎么参与、结果如何复用。'
+  ]).slice(0, 5);
+}
+function buildHrMessage(jobTitle, profile) {
+  const keyStrength = profile.strengths[0] || '我有 AI 产品项目实践和原型落地经验';
+  return `您好，我关注到贵公司的${jobTitle}岗位。${keyStrength}。我希望能结合岗位要求，进一步沟通我在需求拆解、AI 产品原型和项目迭代方面的实践。`;
 }
 function extractJobTitle(jdText) {
   const line = jdText.split(/\n/).find(v => /岗位|职位|名称/.test(v));
   if (!line) return '初级 AI 产品经理';
   return line.replace(/岗位名称|职位名称|岗位|职位|[:：]/g, '').trim().slice(0, 24) || '初级 AI 产品经理';
 }
-function scoreByKeywords(resumeText, jdText) {
-  const words = ['AI', '产品', 'Agent', 'Prompt', 'DeepSeek', '需求', '原型', '用户', '数据', '反馈', '项目'];
-  const hits = words.filter(w => resumeText.includes(w) && jdText.includes(w)).length;
-  return clamp(58 + hits * 4, 56, 88);
+function scoreByKeywords(resumeText, jdText, profile) {
+  const jdNeedsCount = KEYWORD_GROUPS.filter(group => hasAny(normalizeText(jdText), group.words)).length || 1;
+  const matchedCount = KEYWORD_GROUPS.filter(group => hasAny(normalizeText(jdText), group.words) && hasAny(normalizeText(resumeText), group.words)).length;
+  const coverage = matchedCount / jdNeedsCount;
+  const evidenceBonus = ['项目', '上线', '反馈', '用户', '数据', '原型'].filter(w => resumeText.includes(w)).length * 2;
+  return clamp(Math.round(58 + coverage * 24 + evidenceBonus - Math.max(profile.weaknesses.length - 2, 0) * 2), 52, 90);
 }
 function renderResult(result) {
   const level = result.score >= 80 ? '匹配度较高' : result.score >= 65 ? '具备投递基础' : '需要重点补强';
