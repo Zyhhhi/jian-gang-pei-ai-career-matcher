@@ -502,7 +502,10 @@ const STORAGE = {
   history: 'jian_gang_pei_history',
   feedback: 'jian_gang_pei_feedback'
 };
-const API_URL = 'https://api.deepseek.com/chat/completions';
+// 部署 Cloudflare Worker 后，把这里替换成你的 Worker 地址，例如：
+// const WORKER_API_URL = 'https://jian-gang-pei-api.your-name.workers.dev/analyze';
+const WORKER_API_URL = 'https://late-hall-c73cjian-gang-pei-api.sozowali642.workers.dev';
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 const MODEL = 'deepseek-chat';
 
 let currentResult = null;
@@ -879,7 +882,12 @@ async function runAnalyze() {
     currentRecordId = saveHistory(currentResult);
     renderResult(currentResult);
     renderHistory();
-    setStatus(currentResult.meta.mock ? 'DeepSeek API 不可用或未配置 Key，已使用 Mock 结果完成演示。' : '分析完成，结果已保存到历史记录。', currentResult.meta.mock ? '' : 'success');
+    setStatus(
+      currentResult.meta.mock
+        ? `已启用本地兜底分析：${currentResult.meta.reason || 'DeepSeek 调用失败或未配置服务端代理'}。`
+        : `分析完成，已通过${currentResult.meta.source === 'worker' ? '服务端代理' : '浏览器直连 DeepSeek'}生成结果，并保存到历史记录。`,
+      currentResult.meta.mock ? '' : 'success'
+    );
   } catch (err) {
     const fallback = createMockResult(resumeInput.value.trim(), jdInput.value.trim(), 'API 异常后 Mock 兜底');
     currentResult = fallback;
@@ -893,16 +901,58 @@ async function runAnalyze() {
 }
 async function analyzeWithFallback(resumeText, jdText) {
   const key = apiKeyInput.value.trim() || localStorage.getItem(STORAGE.apiKey) || '';
+  if (WORKER_API_URL) {
+    try {
+      return await callWorker(resumeText, jdText);
+    } catch (err) {
+      console.warn('Worker failed, fallback to local mode:', err);
+      if (!key) return createMockResult(resumeText, jdText, `Worker 调用失败：${err.message || '未知错误'}`);
+    }
+  }
   if (!key) return createMockResult(resumeText, jdText, '未配置 DeepSeek API Key');
   try {
-    return await callDeepSeek(resumeText, jdText, key);
+    return await callDeepSeekDirect(resumeText, jdText, key);
   } catch (err) {
     console.warn('DeepSeek failed, fallback to mock:', err);
-    return createMockResult(resumeText, jdText, err.message || 'API 调用失败');
+    return createMockResult(resumeText, jdText, `浏览器直连 DeepSeek 失败：${err.message || 'API 调用失败'}`);
   }
 }
-async function callDeepSeek(resumeText, jdText, key) {
-  const prompt = `你是一个基于 DeepSeek 文本模型的求职匹配分析 Agent。请只基于用户粘贴的简历文本和岗位 JD 文本进行分析，输出严格 JSON，不要 Markdown。
+async function callWorker(resumeText, jdText) {
+  const resp = await fetch(WORKER_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resumeText, jdText })
+  });
+  const data = await readJsonResponse(resp);
+  if (!resp.ok) throw new Error(data.error || `Worker HTTP ${resp.status}`);
+  return { ...data, meta: { mock: false, source: 'worker' } };
+}
+async function callDeepSeekDirect(resumeText, jdText, key) {
+  const resp = await fetch(DEEPSEEK_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: '你是资深 HR 和 AI 产品经理教练，只能分析用户提供的文本，只返回严格 JSON。' },
+        { role: 'user', content: buildAnalyzePrompt(resumeText, jdText) }
+      ],
+      temperature: 0.25,
+      max_tokens: 2600
+    })
+  });
+  const data = await readJsonResponse(resp);
+  if (!resp.ok) throw new Error(data.error?.message || data.error || `DeepSeek HTTP ${resp.status}`);
+  const content = data.choices?.[0]?.message?.content || '';
+  return { ...JSON.parse(stripCodeFence(content)), meta: { mock: false, source: 'direct' } };
+}
+async function readJsonResponse(resp) {
+  const text = await resp.text();
+  try { return JSON.parse(text); }
+  catch { return { error: text || '响应不是 JSON' }; }
+}
+function buildAnalyzePrompt(resumeText, jdText) {
+  return `你是一个基于 DeepSeek 文本模型的求职匹配分析 Agent。请只基于用户粘贴的简历文本和岗位 JD 文本进行分析，输出严格 JSON，不要 Markdown。
 
 JSON 字段：
 {
@@ -929,23 +979,6 @@ ${resumeText}
 
 【岗位 JD 文本】
 ${jdText}`;
-  const resp = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: '你是资深 HR 和 AI 产品经理教练，只能分析用户提供的文本，只返回严格 JSON。' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.25,
-      max_tokens: 2600
-    })
-  });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content || '';
-  return JSON.parse(stripCodeFence(content));
 }
 function stripCodeFence(text) {
   const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);

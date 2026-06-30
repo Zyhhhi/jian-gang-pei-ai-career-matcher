@@ -70,12 +70,62 @@
 - 单文件静态页面：`index.html`
 - 原生 HTML / CSS / JavaScript
 - 数据存储：`localStorage`
-- API：DeepSeek 文本 API，可选输入 API Key
+- API：DeepSeek 文本 API；推荐通过 Cloudflare Worker 代理调用
 - 部署：GitHub Pages
 
 ## 安全说明
 
-项目不会在代码中写死 API Key。用户可在本地浏览器输入 DeepSeek API Key 进行真实分析；公开访问时，如果没有 Key 或 API 不可用，会自动使用 Mock 结果兜底。
+项目不会在代码中写死 API Key。
+
+推荐线上部署方式：
+
+- GitHub Pages 托管前端页面
+- Cloudflare Worker 作为 DeepSeek API 代理
+- `DEEPSEEK_API_KEY` 放在 Cloudflare Worker 环境变量中
+- 前端只请求 Worker，不直接暴露 DeepSeek Key
+
+公开访问时，如果 Worker 未配置、DeepSeek 调用失败或 API 不可用，会自动使用本地兜底分析，保证演示流程不断。
+
+## Cloudflare Worker 部署步骤
+
+1. 登录 Cloudflare，进入 `Workers & Pages`
+2. 创建一个新的 Worker
+3. 将 `cloudflare-worker.js` 中的代码复制到 Worker 编辑器
+4. 在 Worker 的环境变量中新增：
+
+```text
+DEEPSEEK_API_KEY=你的 DeepSeek API Key
+```
+
+可选环境变量：
+
+```text
+DEEPSEEK_MODEL=deepseek-chat
+```
+
+5. 保存并部署 Worker，得到类似这样的地址：
+
+```text
+https://your-worker-name.your-account.workers.dev
+```
+
+6. 回到 `index.html`，把顶部配置改成你的 Worker 分析接口：
+
+```js
+const WORKER_API_URL = 'https://your-worker-name.your-account.workers.dev/analyze';
+```
+
+如果 Worker 没有单独配置路由，也可以直接使用 Worker 根地址：
+
+```js
+const WORKER_API_URL = 'https://your-worker-name.your-account.workers.dev';
+```
+
+7. 提交并推送到 GitHub，等待 GitHub Pages 重新部署。
+
+## 本地调试说明
+
+如果还没有配置 Worker，可以在页面里临时输入 DeepSeek API Key 测试。但浏览器直连 DeepSeek 可能受到 CORS 或网络策略影响，线上稳定版本建议使用 Worker 代理。
 
 ## 面试表达
 
