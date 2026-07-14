@@ -203,6 +203,7 @@
 
 - 当前产品版本：`v0.8.6-alpha`。
 - 当前部署方式：GitHub Pages 从远端 `main` 分支根目录发布。
+- 当前部署状态：`v0.8.6-alpha` 已于 2026-07-14 发布；应用代码基线为 `3a0240050b5925e4e1f8cbdaa38a2ce2bf379b29`，首次 Pages 发布 commit 为 `5df839d5ff6e2f1e6486485728542b91da1f7b93`。
 - 发布前必须确认线上版本号、核心功能和当前 Git 发布基线一致。
 - Worker 基础地址与 API 路径必须分开配置；平台分析路径固定为 `POST /api/platform-analyze`，前端不得向 Worker 根路径 `/` 发送分析请求。
 - `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 在阶段 8.6A 必须保持 `false`。

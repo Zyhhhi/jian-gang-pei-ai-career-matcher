@@ -5,7 +5,7 @@
 - 产品版本：`v0.8.6-alpha`
 - 发布日期：2026-07-14
 - 应用代码基线 commit：`3a0240050b5925e4e1f8cbdaa38a2ce2bf379b29`
-- 首次 GitHub Pages 发布 commit：发布后补充
+- 首次 GitHub Pages 发布 commit：`5df839d5ff6e2f1e6486485728542b91da1f7b93`
 - 发布来源：远端 `main` 分支根目录
 - 线上地址：https://zyhhhi.github.io/jian-gang-pei-ai-career-matcher/
 - Worker 基础地址：https://late-hall-c73cjian-gang-pei-api.sozowali642.workers.dev
@@ -49,7 +49,23 @@
 
 ## 线上验收结果
 
-首次 GitHub Pages 发布后补充，失败项不会隐藏。
+验收地址：https://zyhhhi.github.io/jian-gang-pei-ai-career-matcher/?release=5df839d
+
+- GitHub Pages 构建状态：通过，构建 commit 与 `5df839d5ff6e2f1e6486485728542b91da1f7b93` 一致
+- 首页加载和 `v0.8.6-alpha` 版本展示：通过
+- TXT 导入：通过
+- 标准 Helvetica 文字型 PDF 导入：通过
+- DOCX 导入：通过
+- 简历、JD 和求职记录刷新恢复：通过
+- 本地 Mock 完整分析包和历史记录：通过
+- 自带 API Key 无 Key 拦截：通过
+- 平台 AI 功能开关拦截：通过，测试期间 Worker 请求数为 0
+- Worker 端点配置：`/api/platform-analyze`，没有向 Worker 根路径 `/` 发起 POST
+- 原始简历文件上传检查：未发现原始文件网络请求
+- 390 x 844 与 1440 x 900 横向溢出检查：通过
+- `jobRecords`、`analyticsQueue`、截图元数据和 API Key 原文检查：通过
+- 浏览器控制台 error：0
+- 已知失败：现有中文 CID 字体映射 PDF 测试文件仍可能提取为空；该问题未伪装为通过，保留在已知问题中
 
 ## 已知问题
 
