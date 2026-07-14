@@ -5,7 +5,7 @@
 - 阶段：8.6B 平台 AI 安全闭环与可信输出
 - 日期：2026-07-14
 - 分支：`feature/commercial-mvp`
-- 实现 commit：完成验证后补充
+- 实现 commit：`55f564c3a8fbaa3d217cf597380761b97a99e3eb`
 - 公开平台开关：`ENABLE_PLATFORM_AI = false`
 - 真实 Worker 部署：未执行
 - 真实 Supabase migration：未执行
@@ -96,7 +96,9 @@ Mock 契约命令：
 node --test worker/tests/stage-8.6b-worker.test.mjs
 ```
 
-已覆盖 DeepSeek 参数、认证与输入、免费/付费额度、并发、requestId 幂等、Provider 429/500/超时/空内容/非 JSON、Schema 错误、失败退款、重复退款、重复 finalize、stale 恢复、跨用户 requestId 和 Prompt Injection 数据边界。
+自动化结果：21/21 通过。已覆盖 DeepSeek 参数、认证与输入、免费/付费额度、并发、requestId 幂等、Provider 429/500/超时/空内容/非 JSON、Schema 错误、失败退款、重复退款、重复 finalize、stale 恢复、跨用户 requestId、伪造 userId、RPC 已提交但响应丢失和 Prompt Injection 数据边界。
+
+Wrangler `deploy --dry-run` 通过，未执行真实部署。Playwright 访问 `http://127.0.0.1:4178/index.html`，控制台 error 为 0；验证 Mock 报告生成、平台开关关闭且无 Worker 请求、输入保留、可信度展示、无效输出拒绝和 `unsupported` 建议隐藏。
 
 真实环境尚未完成：
 
