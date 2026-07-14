@@ -82,10 +82,10 @@
 不使用强制重置。若新版出现阻断问题，在 `main` 上创建针对应用代码基线提交的 revert 提交并推送：
 
 ```powershell
-git switch main
-git pull --ff-only origin main
+git fetch origin main
+git switch -c rollback/v0.8.6-alpha origin/main
 git revert 3a0240050b5925e4e1f8cbdaa38a2ce2bf379b29
-git push origin main
+git push origin HEAD:main
 ```
 
 紧急情况下还可先把 `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 保持为 `false`；当前发布默认已经关闭平台 AI。
