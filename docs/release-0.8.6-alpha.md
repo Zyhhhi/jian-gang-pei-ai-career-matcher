@@ -4,7 +4,7 @@
 
 - 产品版本：`v0.8.6-alpha`
 - 发布日期：2026-07-14
-- 应用代码基线 commit：`1daa3376b01aab0de82bbf56fc309715af8dc666`
+- 应用代码基线 commit：`3a0240050b5925e4e1f8cbdaa38a2ce2bf379b29`
 - 首次 GitHub Pages 发布 commit：发布后补充
 - 发布来源：远端 `main` 分支根目录
 - 线上地址：https://zyhhhi.github.io/jian-gang-pei-ai-career-matcher/
@@ -68,7 +68,7 @@
 ```powershell
 git switch main
 git pull --ff-only origin main
-git revert 1daa3376b01aab0de82bbf56fc309715af8dc666
+git revert 3a0240050b5925e4e1f8cbdaa38a2ce2bf379b29
 git push origin main
 ```
 
