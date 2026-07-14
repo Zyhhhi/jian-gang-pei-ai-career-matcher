@@ -36,3 +36,8 @@ with check (
 -- 不要给普通 authenticated 用户开放 paid_credits 更新权限。
 -- 后续支付成功后的 paid_credits 增加，应由 Cloudflare Worker 或管理端使用服务端权限完成。
 -- 后续真实分析时的 free_used / paid_credits 扣减，也必须由 Cloudflare Worker 校验登录、额度和限流后执行。
+
+-- Stage 8.6B does not grant update access to browser roles. After this base
+-- table exists, run docs/migrations/20260714_stage_8_6b_atomic_ai_quota.sql.
+-- The migration adds nonnegative constraints and service-role-only transaction
+-- RPCs for reserve, finalize and refund. Do not update quota directly in the frontend.

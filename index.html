@@ -1099,7 +1099,7 @@ const SUPABASE_AUTH_CONFIG = {
 };
 
 const RELEASE_CONFIG = Object.freeze({
-  VERSION: 'v0.8.6-alpha',
+  VERSION: 'v0.8.6-beta',
   MODE_SUMMARY: '本地演示开放；自带 Key 与平台 AI 暂未开放真实调用',
   UPDATED_AT: '2026-07-14'
 });
@@ -2996,6 +2996,7 @@ function createPlatformRequestId() {
 function buildPlatformAnalyzePayload(requestId, profile, draft) {
   return {
     requestId,
+    analysisMode: 'platform_api',
     resumeProfile: {
       targetRole: profile.targetRole || '',
       educationSummary: profile.educationSummary || '',
@@ -3054,19 +3055,7 @@ async function runPlatformAnalyze(profile, draft, startedAt) {
     return;
   }
   setStep(2);
-  currentResult = normalizeResult({
-    ...data.report,
-    companyName: data.report?.companyName || draft.companyName,
-    jobTitle: data.report?.jobTitle || draft.jobTitle,
-    city: data.report?.city || draft.city,
-    salaryRange: data.report?.salaryRange || draft.salaryRange,
-    meta: {
-      mock: false,
-      source: 'platform_worker',
-      model: data.model || '',
-      quotaType: data.quotaType || ''
-    }
-  });
+  currentResult = normalizeTrustedPlatformResult(data.report, data, draft);
   setStep(3);
   finishSteps();
   currentRecordId = saveHistory(currentResult);
@@ -3112,27 +3101,141 @@ function handlePlatformApiFailure(data = {}, startedAt = performance.now()) {
     durationMs: performance.now() - startedAt,
     metadata
   });
-  if (errorCode === 'QUOTA_EXHAUSTED') trackEvent('quota_exhausted', { success: false, metadata });
+  if (['QUOTA_EXHAUSTED', 'NO_QUOTA'].includes(errorCode)) trackEvent('quota_exhausted', { success: false, metadata });
   if (errorCode === 'RATE_LIMITED') trackEvent('rate_limited', { success: false, metadata });
-  if (errorCode === 'TEXT_TOO_LONG') trackEvent('text_too_long', { success: false, metadata });
-  if (errorCode === 'DEEPSEEK_PARSE_FAILED') trackEvent('deepseek_parse_failed', { success: false, metadata });
-  if (['DUPLICATE_REQUEST', 'REQUEST_PROCESSING'].includes(errorCode)) trackEvent('duplicate_request', { success: false, metadata });
+  if (['TEXT_TOO_LONG', 'RESUME_TOO_LONG', 'JD_TOO_LONG', 'INPUT_TOO_LONG'].includes(errorCode)) trackEvent('text_too_long', { success: false, metadata });
+  if (errorCode === 'INVALID_MODEL_OUTPUT') trackEvent('deepseek_parse_failed', { success: false, metadata });
+  if (['REQUEST_ALREADY_COMPLETED', 'REQUEST_IN_PROGRESS', 'REQUEST_ID_REQUIRES_RETRY'].includes(errorCode)) trackEvent('duplicate_request', { success: false, metadata });
   setStatus(message, 'error');
 }
 function platformApiErrorMessage(errorCode, fallback) {
   const messages = {
     AUTH_REQUIRED: '平台 AI 模式需要登录后使用。',
+    INVALID_TOKEN: '登录状态已失效，请重新登录后再试。',
+    NO_QUOTA: '免费次数已用完，后续可 5 元购买 15 次完整求职分析额度。',
     QUOTA_EXHAUSTED: '免费次数已用完，后续可 5 元购买 15 次完整求职分析额度。',
     RATE_LIMITED: '请求过于频繁，请稍后再试。',
     TEXT_TOO_LONG: '简历或岗位 JD 内容过长，请精简后再分析。',
-    DUPLICATE_REQUEST: '本次请求已处理过，系统不会重复扣费。',
-    REQUEST_PROCESSING: '同一请求正在处理中，请稍后查看结果。',
-    DEEPSEEK_PARSE_FAILED: 'AI 返回内容解析失败，本次不扣次数，请稍后重试。'
+    RESUME_TOO_LONG: '简历正文超过 12000 字，请精简后再分析，系统不会静默截断。',
+    JD_TOO_LONG: '岗位 JD 超过 8000 字，请精简后再分析。',
+    INPUT_TOO_LONG: '简历和岗位 JD 总长度超过 20000 字，请精简后再分析。',
+    REQUEST_ALREADY_COMPLETED: '本次请求已成功处理，系统不会再次调用模型或重复扣费。',
+    REQUEST_IN_PROGRESS: '同一请求正在处理中，请勿重复提交。',
+    REQUEST_ID_REQUIRES_RETRY: '上次请求未完成，请使用新的请求编号重试。',
+    MODEL_TIMEOUT: '模型响应超时，本次预留额度已退回，请稍后使用新的请求重试。',
+    MODEL_PROVIDER_ERROR: '模型服务暂时不可用，本次预留额度已退回，请稍后重试。',
+    INVALID_MODEL_OUTPUT: 'AI 返回结果未通过可信结构校验，本次预留额度已退回，不会展示不完整结果。',
+    QUOTA_RESERVATION_FAILED: '额度预留失败，未调用模型，请稍后重试。',
+    QUOTA_REFUND_FAILED: '请求失败，但额度退款状态需要人工核对，请暂时不要重复提交。'
   };
   return messages[errorCode] || fallback || '平台 AI 调用失败，请稍后重试或切换到本地演示模式。';
 }
+function normalizeTrustedPlatformResult(report, transport = {}, draft = {}) {
+  if (
+    !report || report.schemaVersion !== '1.0' || !report.scores || !report.jobSummary ||
+    !report.recommendation || !report.keywords || !report.interviewPrep || !report.trust ||
+    !Array.isArray(report.matches) || !Array.isArray(report.risks) ||
+    !Array.isArray(report.resumeSuggestions) || !Array.isArray(report.recommendation.reasons) ||
+    !Array.isArray(report.keywords.existingKeywords) || !Array.isArray(report.keywords.missingKeywords) ||
+    !Array.isArray(report.trust.missingInformation) || !Array.isArray(report.trust.assumptions)
+  ) {
+    throw new Error('平台 AI 返回结果缺少可信分析字段。');
+  }
+  const score = Number(report.scores.overall);
+  if (!Number.isFinite(score) || score < 0 || score > 100) {
+    throw new Error('平台 AI 返回的匹配分数无效。');
+  }
+  const recommendationLabels = {
+    recommended: '值得重点投',
+    cautious: '可以投但建议谨慎评估',
+    not_recommended: '不建议重点投'
+  };
+  const recommendationLabel = recommendationLabels[report.recommendation.recommendation];
+  if (!recommendationLabel || typeof report.recommendation.summary !== 'string' || !report.recommendation.summary.trim()) {
+    throw new Error('平台 AI 返回的投递建议无效。');
+  }
+  const matchLabels = { strong: '强匹配', partial: '部分匹配', weak: '弱匹配', unknown: '信息不足' };
+  const usableSuggestions = (report.resumeSuggestions || []).filter(item => item.evidenceStatus !== 'unsupported');
+  const directlySupported = usableSuggestions.filter(item => item.evidenceStatus === 'supported');
+  const missingKeywordRows = report.keywords?.missingKeywords || [];
+  const formatMatch = item => `【${matchLabels[item.matchLevel] || item.matchLevel}，置信度 ${item.confidence}%】${item.jdRequirement}；简历证据：${item.resumeEvidence}；判断：${item.reasoning}`;
+  const formatRisk = item => `【${item.type}，置信度 ${item.confidence}%】${item.conclusion}；JD 证据：${item.jdEvidence}；简历证据：${item.resumeEvidence}；面试准备：${item.interviewAdvice}`;
+
+  return normalizeResult({
+    matchScore: score,
+    matchLevel: getMatchLevel(score),
+    applyRecommendation: recommendationLabel,
+    summary: report.recommendation.summary,
+    companyName: report.jobSummary.companyName || draft.companyName || '',
+    jobTitle: report.jobSummary.jobTitle || draft.jobTitle || '目标岗位',
+    city: report.jobSummary.location || draft.city || '',
+    salaryRange: report.jobSummary.salary || draft.salaryRange || '',
+    jdBreakdown: {
+      coreResponsibilities: report.jobSummary.coreResponsibilities,
+      hardRequirements: report.jobSummary.hardRequirements,
+      bonusPoints: [],
+      hiddenRequirements: [],
+      risks: report.risks.map(formatRisk),
+      interviewFocus: report.interviewPrep.likelyQuestions
+    },
+    resumeMatches: report.matches.map(formatMatch),
+    resumeWeaknesses: report.risks.map(formatRisk),
+    keywordAnalysis: {
+      covered: report.keywords.existingKeywords,
+      missing: missingKeywordRows.map(item => `${item.keyword}：${item.reason}`),
+      suggested: missingKeywordRows
+        .filter(item => item.status !== 'do_not_add')
+        .map(item => `${item.keyword}（${item.status === 'can_add' ? '可基于真实经历补充' : '需要本人确认后补充'}）`)
+    },
+    optimizationSuggestions: usableSuggestions.map(item => ({
+      module: item.section,
+      currentProblem: item.issue,
+      direction: item.reason,
+      recommendedExpression: item.evidenceStatus === 'supported'
+        ? item.suggestedText
+        : `【需本人确认】${item.suggestedText}`
+    })),
+    resumeRewrite: {
+      summary: directlySupported.find(item => /总结|简介/.test(item.section))?.suggestedText || '',
+      projectExample: directlySupported.find(item => /项目/.test(item.section))?.suggestedText || '',
+      skillsExample: directlySupported.find(item => /技能/.test(item.section))?.suggestedText || ''
+    },
+    outreachScripts: { boss: '', wechat: '', emailSubject: '', emailBody: '', attachmentReminder: '' },
+    interviewPrep: {
+      jdQuestions: report.interviewPrep.likelyQuestions,
+      projectQuestions: report.interviewPrep.projectDeepDiveQuestions,
+      weaknessQuestions: report.interviewPrep.weaknessQuestions,
+      aiProductQuestions: report.interviewPrep.conceptsToReview,
+      hrQuestions: report.interviewPrep.preparationAdvice
+    },
+    selfIntroduction: '',
+    reverseQuestions: [],
+    trustDetails: {
+      schemaVersion: report.schemaVersion,
+      requestId: report.requestId,
+      generatedAt: report.generatedAt,
+      model: report.model,
+      scores: report.scores,
+      reasons: report.recommendation.reasons,
+      overallConfidence: report.trust.overallConfidence,
+      evidenceCoverage: report.trust.evidenceCoverage,
+      missingInformation: report.trust.missingInformation,
+      assumptions: report.trust.assumptions
+    },
+    meta: {
+      mock: false,
+      source: 'platform_worker',
+      model: transport.model || report.model,
+      quotaType: transport.quotaType || '',
+      schemaVersion: report.schemaVersion,
+      requestId: report.requestId
+    }
+  });
+}
 function normalizeResult(result) {
-  const score = clamp(Number(result.matchScore ?? result.score) || 60, 0, 100);
+  const rawScore = Number(result.matchScore ?? result.score);
+  if (!Number.isFinite(rawScore)) throw new Error('分析结果缺少有效匹配分数。');
+  const score = clamp(rawScore, 0, 100);
   const keywordAnalysis = result.keywordAnalysis || result.missingKeywords || {};
   const jdBreakdown = result.jdBreakdown || result.jdAnalysis || {};
   const rewritten = result.rewrittenResumeContent || {};
@@ -3200,6 +3303,7 @@ function normalizeResult(result) {
     resumeSuggestions: optimizationSuggestions.map(item => item.recommendedExpression || item.direction || item.problem).filter(Boolean),
     interviewQuestions: flattenInterviewPrep(interviewPrep),
     hrMessage: outreachScripts.boss || '',
+    trustDetails: result.trustDetails || null,
     meta: result.meta || { mock: true }
   };
 }
@@ -3613,6 +3717,7 @@ function renderResult(result) {
       <button class="plain-btn" type="button" onclick="runAnalyze()">重新生成</button>
     </div>
     <div class="result-grid">
+      ${renderTrustedAnalysis(result.trustDetails)}
       ${renderJdBreakdown(result.jdBreakdown)}
       ${renderCard('简历匹配点', result.resumeMatches)}
       ${renderCard('简历短板', result.resumeWeaknesses)}
@@ -3641,6 +3746,28 @@ function renderResult(result) {
   `;
   resultPanel.classList.add('visible');
   resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function renderTrustedAnalysis(trust) {
+  if (!trust) return '';
+  const scoreRows = [
+    ['综合', trust.scores.overall],
+    ['技能', trust.scores.skills],
+    ['项目', trust.scores.projects],
+    ['工具', trust.scores.tools],
+    ['行业', trust.scores.industry],
+    ['学历与经验', trust.scores.educationAndExperience]
+  ].map(([label, score]) => `${label}：${score} 分`);
+  const reasonRows = trust.reasons.map(item => `【${item.kind} / ${item.confidence}%】${item.statement}；证据：${item.evidence}`);
+  return `<div class="result-card wide">
+    <h3>可信度与证据说明</h3>
+    <p class="hint">Schema ${escapeHtml(trust.schemaVersion)} · 模型 ${escapeHtml(trust.model)} · 综合置信度 ${trust.overallConfidence}% · 证据覆盖率 ${trust.evidenceCoverage}%</p>
+    <div class="result-grid">
+      ${renderMiniList('评分拆解', scoreRows)}
+      ${renderMiniList('事实 / 推断 / 建议依据', reasonRows)}
+      ${renderMiniList('信息不足', trust.missingInformation)}
+      ${renderMiniList('分析假设', trust.assumptions)}
+    </div>
+  </div>`;
 }
 function renderJdBreakdown(jd) {
   return `<div class="result-card wide">

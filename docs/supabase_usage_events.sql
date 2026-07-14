@@ -43,3 +43,6 @@ with check (true);
 -- hasResumeProfile, and hasConfirmedJD.
 -- Do not store resume text, full JD text, API Key, phone, email, real name,
 -- screenshot base64, image files, or the raw DeepSeek request.
+-- Stage 8.6B also forbids storing model raw responses, access tokens, request
+-- payloads, email addresses or phone numbers. New stable error codes may be
+-- recorded only as the short errorCode value.

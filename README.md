@@ -11,7 +11,7 @@
 
 ## 当前发布基线
 
-- 产品版本：`v0.8.6-alpha`
+- 本地代码版本：`v0.8.6-beta`；当前公开 GitHub Pages 仍是 `v0.8.6-alpha` 发布基线
 - 本地演示模式：已开放，使用本地规则 / Mock 生成演示分析
 - 自带 API Key 模式：仅完成本地保存与界面，尚未启用真实模型调用
 - 平台 AI 模式：`ENABLE_PLATFORM_AI = false`，安全与额度闭环测试完成前不调用 Worker、不扣减额度
@@ -121,7 +121,7 @@
 
 ## 阶段 8：Cloudflare Worker + DeepSeek 平台 API
 
-阶段 8 新增了独立的 `worker/` 目录，用于平台 AI 模式的后端代理。前端不会直接调用 DeepSeek，也不会保存或展示平台 DeepSeek API Key。阶段 8.6A 将前端平台 AI 开关设为关闭，以下流程是尚未正式开放的后端设计。
+阶段 8 新增了独立的 `worker/` 目录，用于平台 AI 模式的后端代理。阶段 8.6B 已在代码层加入原子额度预留、失败退款、严格输出 Schema 和 Prompt Injection 数据边界，但 migration 尚需在真实 Supabase 项目中手动执行并完成端到端验收。公开前端仍保持 `ENABLE_PLATFORM_AI = false`。
 
 平台 AI 调用流程：
 
@@ -130,11 +130,12 @@
 3. 前端生成 `requestId`，携带 Supabase `access_token`、`resumeProfile`、`jobDraft` 和 `anonymousUserId` 请求 Cloudflare Worker。
 4. Worker 校验 Supabase token，不信任前端传来的 userId。
 5. Worker 校验 `jobDraft.jdConfirmed`、简历和 JD 文本长度。
-6. Worker 读取 `user_quota`，判断使用免费额度还是付费额度。
-7. Worker 查询 `ai_requests`，防止同一 `requestId` 重复扣费。
-8. Worker 做基础限流：同一用户 24 小时最多 10 次成功生成，同一用户 1 分钟最多 2 次请求。
-9. Worker 调用 DeepSeek `deepseek-v4-pro`，并使用官方 JSON 输出参数；thinking mode 参数已按 DeepSeek 官方文档开启。
-10. 只有 DeepSeek 成功返回且 JSON 解析成功后，Worker 才扣减额度并返回完整求职分析包。
+6. Worker 调用 `reserve_ai_quota` RPC，在数据库事务和行锁内预留免费或付费额度，并创建 `reserved` 请求。
+7. Worker 将请求转换为 `processing`；同一 `requestId` 不能启动第二次模型调用。
+8. Worker 做基础用户限流：同一用户 24 小时最多 10 次成功生成，同一用户 1 分钟最多 2 次请求。
+9. Worker 调用 DeepSeek `deepseek-v4-pro`，使用 JSON Output、thinking mode、顶层 `reasoning_effort` 和约 60 秒超时，不自动重试。
+10. 模型输出必须通过 `analysisSchemaVersion = 1.0` 的完整字段、类型、枚举、分数、证据和 requestId 校验。
+11. 校验成功后调用 `finalize_ai_request_success` 确认消费；Provider、超时、解析或 Schema 失败时调用 `refund_ai_quota` 恢复原额度。
 
 前端配置：
 
@@ -155,11 +156,13 @@ Worker 环境变量：
 - `SUPABASE_SERVICE_ROLE_KEY`：只放在 Cloudflare Worker secret，绝对不能放前端。
 - `ALLOWED_ORIGIN`：允许访问 Worker 的前端域名。
 - `DEEPSEEK_MODEL`：默认 `deepseek-v4-pro`。
+- `MODEL_TIMEOUT_MS`：可选，默认 `60000`；用于 Worker 模型请求超时。
 
 Supabase SQL：
 
 - `docs/supabase_auth_quota.sql`：`user_quota` 表，保存免费次数、已用免费次数、付费额度。
 - `docs/supabase_ai_requests.sql`：`ai_requests` 表，保存 `requestId`、用户、处理状态、额度类型、模型、输入输出长度和错误码，用于防重复扣费、限流统计和审计。
+- `docs/migrations/20260714_stage_8_6b_atomic_ai_quota.sql`：非破坏性 Stage 8.6B migration，新增审计字段、约束和原子额度 RPC。必须在重新部署 Worker 前手动执行。
 - `docs/supabase_usage_events.sql`：匿名行为事件表，阶段 8 增加平台 AI 请求相关事件说明。
 
 安全边界：
@@ -168,8 +171,10 @@ Supabase SQL：
 - Supabase `service_role` key 只能放在 Worker 环境变量。
 - 前端只允许使用 Supabase `anon` key。
 - Worker 不把简历原文、完整 JD、API Key、截图 base64 或 DeepSeek 原始请求全文写入 `usage_events`。
-- 输入校验失败、登录失败、额度不足、限流、重复请求、DeepSeek 失败、JSON 解析失败都不扣次数。
-- JSON 解析失败时返回 `DEEPSEEK_PARSE_FAILED`，并在 `ai_requests.error_code` 记录 `PARSE_FAILED`；第一版策略是不扣用户次数。
+- 输入校验失败、登录失败、额度不足、限流和重复请求不会调用模型或预留额度。
+- Provider 失败、超时、空响应、非 JSON 或 Schema 不合法会进入退款 RPC，最终不消耗用户额度。
+- `ai_requests` 状态机为 `reserved -> processing -> success`，失败路径为 `reserved/processing -> failed -> refunded`。
+- 敏感 RPC 已撤销 `anon` 和 `authenticated` 的执行权限，只授予 `service_role`。
 
 当前限制：
 
@@ -177,6 +182,7 @@ Supabase SQL：
 - IP 持久化限流目前只做文档预留；当前 Worker 使用 `ai_requests` 做用户级限流和 `requestId` 去重。后续可用 Durable Objects、Cloudflare WAF 或为 `ai_requests` 增加 `ip_hash`。
 - 自带 API Key 模式仍不在前端直连 DeepSeek；当前仍保持本地规则 / Mock 占位。
 - OCR / 多模态截图识别不在本阶段实现。
+- 当前 8.6B 自动化结果来自 Mock Supabase RPC / Mock Provider；真实 Supabase migration、真实 JWT、真实 DeepSeek 和 Cloudflare Worker 端到端尚未验收，不得据此开放公开开关。
 
 ## 当前本地数据
 
