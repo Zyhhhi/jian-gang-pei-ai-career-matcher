@@ -1,0 +1,14 @@
+name = "jian-gang-pei-platform-ai"
+main = "index.js"
+compatibility_date = "2026-07-09"
+
+# 示例变量，不要在这里写真实密钥。
+# 真实密钥使用 wrangler secret put 配置。
+[vars]
+SUPABASE_URL = "https://your-project.supabase.co"
+ALLOWED_ORIGIN = "https://zyhhhi.github.io"
+DEEPSEEK_MODEL = "deepseek-v4-pro"
+
+# Secrets:
+# wrangler secret put DEEPSEEK_API_KEY
+# wrangler secret put SUPABASE_SERVICE_ROLE_KEY

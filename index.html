@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>简历分析｜AI 简历-JD 匹配工具</title>
+<title>简岗配 AI｜求职岗位匹配与简历优化助手</title>
+<link rel="icon" href="data:,">
+<!-- Cloudflare Web Analytics 预留位置：
+     后续在 Cloudflare Web Analytics 创建站点后，将官方统计脚本粘贴到这里。
+     当前阶段不要写死真实 token；未配置脚本时页面应保持正常运行。 -->
 <style>
 :root {
   --bg: #f5f5f7;
@@ -39,7 +43,7 @@ body {
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
-button, textarea, input { font: inherit; }
+button, textarea, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .68; }
 a { color: inherit; }
@@ -201,9 +205,292 @@ a { color: inherit; }
 }
 .hint { color: var(--muted); font-size: 13px; margin-top: 7px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.form-grid .field:only-child { grid-column: 1 / -1; }
 .field label { display: flex; justify-content: space-between; gap: 12px; font-weight: 720; margin-bottom: 8px; }
 .count { color: var(--muted); font-weight: 520; font-size: 12px; }
-textarea, input {
+.profile-panel { margin-bottom: 24px; }
+.profile-empty {
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px dashed var(--line-strong);
+  background: rgba(233,247,241,.62);
+  color: var(--text);
+}
+.profile-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.profile-item {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.74);
+}
+.profile-item.wide { grid-column: 1 / -1; }
+.profile-item strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.profile-item p { margin: 0; color: var(--text); font-size: 14px; }
+.profile-editor { display: none; margin-top: 18px; }
+.profile-editor.visible { display: block; }
+.profile-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.profile-file input { max-width: 340px; background: #fff; }
+.resume-file-details {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+.resume-file-meta,
+.resume-file-status,
+.resume-length-warning {
+  display: none;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.resume-file-meta.visible,
+.resume-file-status.visible,
+.resume-length-warning.visible { display: block; }
+.resume-file-meta { background: rgba(245,245,247,.86); color: var(--text); }
+.resume-file-status { background: rgba(245,245,247,.86); color: var(--muted); }
+.resume-file-status.success { background: var(--green-soft); color: var(--green); }
+.resume-file-status.error,
+.resume-length-warning { background: var(--red-soft); color: var(--red); }
+.profile-safe {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 13px;
+}
+.job-draft { display: grid; gap: 16px; }
+.job-method {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255,255,255,.7);
+}
+.job-method h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+.flow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.flow-steps span {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(245,245,247,.92);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 680;
+}
+.method-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--green-soft);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 720;
+}
+.ai-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.ai-mode-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255,255,255,.74);
+  padding: 14px;
+  text-align: left;
+  color: var(--text);
+  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+}
+.ai-mode-card:hover { transform: translateY(-1px); border-color: var(--line-strong); }
+.ai-mode-card.active {
+  border-color: rgba(8,127,91,.45);
+  background: var(--green-soft);
+}
+.ai-mode-card strong { display: block; color: var(--ink); margin-bottom: 6px; }
+.ai-mode-card span { display: block; font-size: 13px; }
+.mode-detail {
+  display: none;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(245,245,247,.74);
+}
+.mode-detail.visible { display: block; }
+.mode-rules {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.mode-rules li {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.82);
+  border: 1px solid rgba(29,29,31,.05);
+  color: var(--text);
+  font-size: 13px;
+}
+.quota-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.quota-pill {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.82);
+  border: 1px solid rgba(29,29,31,.05);
+}
+.quota-pill strong { display: block; color: var(--ink); font-size: 16px; line-height: 1.1; }
+.quota-pill span { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.auth-box {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(245,245,247,.74);
+}
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.manual-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.manual-grid .field.wide { grid-column: 1 / -1; }
+.field.compact textarea { min-height: 110px; }
+.screenshot-upload {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.screenshot-upload input { max-width: 360px; background: #fff; }
+.screenshot-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+.screenshot-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(245,245,247,.86);
+  color: var(--text);
+  font-size: 13px;
+}
+.screenshot-item strong { color: var(--ink); }
+.confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.confirm-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 720;
+}
+.confirm-badge.ok { background: var(--green-soft); color: var(--green); }
+.confirm-badge.bad { background: var(--red-soft); color: var(--red); }
+.privacy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.privacy-note {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.74);
+  color: var(--text);
+  font-size: 14px;
+}
+.privacy-note strong { display: block; color: var(--ink); margin-bottom: 5px; }
+.data-status-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.data-status-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(245,245,247,.86);
+  border: 1px solid rgba(29,29,31,.05);
+  color: var(--text);
+  font-size: 13px;
+}
+.data-status-item strong {
+  text-align: right;
+  white-space: nowrap;
+}
+.analytics-note {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--blue-soft);
+  color: #1559a6;
+  font-size: 13px;
+}
+.danger-btn {
+  border: 1px solid rgba(180,35,24,.18);
+  background: var(--red-soft);
+  color: var(--red);
+  border-radius: 999px;
+  padding: 8px 11px;
+  font-size: 12px;
+}
+textarea, input, select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -213,7 +500,8 @@ textarea, input {
   outline: none;
 }
 textarea { min-height: 290px; resize: vertical; }
-textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 0 4px rgba(37,99,235,.08); }
+select { appearance: none; }
+textarea:focus, input:focus, select:focus { border-color: var(--line-strong); box-shadow: 0 0 0 4px rgba(37,99,235,.08); }
 .key-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -265,6 +553,20 @@ textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 
 }
 .score-num { font-size: 72px; line-height: 1; letter-spacing: 0; font-weight: 820; }
 .score-card p { margin: 8px 0 0; color: rgba(255,255,255,.76); }
+.score-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.score-meta div {
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.12);
+}
+.score-meta strong { display: block; font-size: 16px; }
+.score-meta span { color: rgba(255,255,255,.68); font-size: 12px; }
 .badge {
   display: inline-flex;
   width: fit-content;
@@ -286,6 +588,35 @@ textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 
 }
 .result-card.wide { grid-column: 1 / -1; }
 .result-card h3 { margin-bottom: 12px; font-size: 16px; }
+.result-card p { margin: 0 0 10px; color: var(--text); }
+.result-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.result-section-head h3 { margin: 0; }
+.copy-block {
+  white-space: pre-wrap;
+  padding: 13px;
+  border-radius: 16px;
+  background: #f4f5f7;
+  border: 1px solid rgba(29,29,31,.05);
+  color: var(--text);
+}
+.module-list {
+  display: grid;
+  gap: 12px;
+}
+.module-item {
+  padding: 13px;
+  border-radius: 16px;
+  background: #f4f5f7;
+  border: 1px solid rgba(29,29,31,.05);
+}
+.module-item strong { display: block; margin-bottom: 6px; color: var(--ink); }
+.module-item p { margin: 4px 0; }
 .tag-list, .item-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
 .tag-list li {
   padding: 7px 10px;
@@ -372,7 +703,7 @@ textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 
 .capability-list strong { color: var(--ink); }
 .footer { margin-top: 42px; color: var(--muted); font-size: 13px; text-align: center; }
 @media (max-width: 900px) {
-  .hero, .grid, .form-grid, .score-card, .result-grid { grid-template-columns: 1fr; }
+  .hero, .grid, .form-grid, .profile-summary, .manual-grid, .privacy-grid, .score-card, .result-grid, .ai-mode-grid, .quota-summary { grid-template-columns: 1fr; }
   .hero { min-height: auto; padding-top: 18px; }
   .sidebar { position: static; }
   .steps { grid-template-columns: 1fr 1fr; }
@@ -391,7 +722,7 @@ textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 
 <body>
 <main class="shell">
   <nav class="topbar">
-    <div class="brand"><span class="mark">简</span><span>简历分析</span></div>
+    <div class="brand"><span class="mark">简</span><span>简岗配 AI</span></div>
     <div class="top-links">
       <a class="ghost-link" href="#analyzer">开始分析</a>
       <a class="ghost-link" href="#historyPanel">历史记录</a>
@@ -403,13 +734,13 @@ textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 
     <div>
       <span class="eyebrow">AI 求职辅助工具</span>
       <h1>让每一次投递更有判断。</h1>
-      <p>粘贴简历和岗位 JD，快速生成匹配评分、短板提醒、关键词缺失和修改建议，帮助求职者在投递前形成更清晰的判断。</p>
+      <p>导入或粘贴简历，确认岗位 JD，再生成匹配评分、短板提醒、关键词缺失和修改建议，帮助求职者在投递前形成更清晰的判断。</p>
       <div class="hero-actions">
         <button class="primary-btn" type="button" onclick="scrollToAnalyzer()">开始一次匹配分析</button>
         <button class="secondary-btn" type="button" onclick="fillExample()">随机填入示例</button>
       </div>
       <div class="hero-metrics" aria-label="产品能力概览">
-        <div class="metric"><strong>3 步</strong><span>粘贴文本、生成分析、复用结果</span></div>
+        <div class="metric"><strong>4 步</strong><span>简历档案、确认 JD、选择模式、复用结果</span></div>
         <div class="metric"><strong>8 类</strong><span>覆盖产品、运营、数据和智能硬件岗位示例</span></div>
         <div class="metric"><strong>可复用</strong><span>历史记录、复制结果、Markdown 导出</span></div>
       </div>
@@ -417,44 +748,223 @@ textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 
     <aside class="hero-card">
       <h2>产品流程</h2>
       <div class="proof-list">
-        <div class="proof-item"><span class="step-num">1</span><div><strong>粘贴文本</strong><span>输入简历正文和岗位 JD，不依赖文件识别。</span></div></div>
-        <div class="proof-item"><span class="step-num">2</span><div><strong>AI 分析</strong><span>基于文本提取要求、匹配优势、缺失关键词。</span></div></div>
+        <div class="proof-item"><span class="step-num">1</span><div><strong>准备文本</strong><span>本地导入 TXT、文字型 PDF、DOCX，或直接粘贴简历正文。</span></div></div>
+        <div class="proof-item"><span class="step-num">2</span><div><strong>演示分析</strong><span>当前使用本地规则提取岗位要求、匹配优势和缺失关键词。</span></div></div>
         <div class="proof-item"><span class="step-num">3</span><div><strong>结果复用</strong><span>保存历史、复制结果、导出 Markdown。</span></div></div>
       </div>
       <ul class="capability-list">
-        <li><strong>能力边界：</strong>支持文本粘贴分析；不支持自动解析图片、截图或 PDF 简历。</li>
-        <li><strong>稳定演示：</strong>AI 服务不可用时自动使用示例结果兜底，保证展示流程不断。</li>
+        <li><strong>能力边界：</strong>支持 TXT、文字型 PDF、DOCX 本地解析；暂不支持扫描版 PDF、图片简历或 OCR。</li>
+        <li><strong>真实状态：</strong>本地演示模式已开放；自带 Key 与平台 AI 尚未开放真实模型调用。</li>
       </ul>
     </aside>
   </section>
 
   <section class="grid" id="analyzer">
     <div>
+      <section class="panel profile-panel" id="privacyPanel">
+        <div class="panel-head">
+          <div>
+            <h2>使用前说明</h2>
+            <p class="hint">请先确认数据保存方式和工具边界，再上传或粘贴简历、岗位 JD。</p>
+          </div>
+        </div>
+        <div class="privacy-grid">
+          <div class="privacy-note"><strong>求职参考</strong>本工具仅提供求职准备参考，不保证面试或入职结果。</div>
+          <div class="privacy-note"><strong>本地保存</strong>当前版本默认使用当前浏览器 localStorage 保存简历档案、岗位草稿和求职记录。</div>
+          <div class="privacy-note"><strong>随时清空</strong>用户可以随时在“本地数据管理”中清空本地数据。</div>
+          <div class="privacy-note"><strong>敏感信息</strong>请勿上传身份证号、银行卡号、家庭住址、无关聊天记录等敏感信息。</div>
+        </div>
+        <div class="profile-safe">后续如果使用平台 AI，会在发送给 AI 服务前提示用户确认。</div>
+      </section>
+
+      <section class="panel profile-panel">
+        <div class="panel-head">
+          <div>
+            <h2>隐私与数据安全说明</h2>
+            <p class="hint">简历内容仅用于本次岗位匹配分析。当前版本默认将简历档案、岗位草稿和求职记录保存在当前浏览器本地，不会自动上传服务器。自带 API Key 仅保存在本地浏览器，不会写入代码仓库或云端数据库。后续平台 AI 模式下，简历和岗位 JD 会发送至 AI 服务用于生成分析结果，届时会明确提示用户确认。</p>
+          </div>
+        </div>
+        <div class="privacy-grid">
+          <div class="privacy-note"><strong>简历档案</strong>默认保存在当前浏览器 localStorage。</div>
+          <div class="privacy-note"><strong>岗位草稿</strong>默认保存在当前浏览器 localStorage。</div>
+          <div class="privacy-note"><strong>求职记录</strong>默认保存在当前浏览器 localStorage，不保存完整简历原文。</div>
+          <div class="privacy-note"><strong>自带 API Key</strong>默认只保存在当前浏览器 localStorage，不上传服务器、不写入 URL。</div>
+        </div>
+      </section>
+
+      <section class="panel profile-panel" id="resumeProfilePanel">
+        <div class="panel-head">
+          <div>
+            <h2>我的简历档案</h2>
+            <p class="hint">简历档案默认仅保存在当前浏览器本地，可随时删除。</p>
+          </div>
+          <button class="secondary-btn" id="editProfileBtn" type="button" onclick="showProfileEditor()">上传简历 / 粘贴简历</button>
+        </div>
+
+        <div id="profileView"></div>
+
+        <div class="profile-editor" id="profileEditor">
+          <div class="profile-file">
+            <input id="resumeFileInput" type="file" accept=".txt,.pdf,.docx">
+            <span class="hint">支持 TXT、PDF、DOCX 简历文件，或直接在下方粘贴简历正文。单个文件最大 10MB。</span>
+          </div>
+          <div class="resume-file-details">
+            <div class="resume-file-meta" id="resumeFileMeta"></div>
+            <div class="resume-file-status" id="resumeFileStatus" role="status" aria-live="polite"></div>
+          </div>
+          <div class="field">
+            <label for="resumeInput">简历文本 <span class="count" id="resumeCount">0 字</span></label>
+            <textarea id="resumeInput" placeholder="上传 TXT、文字型 PDF、DOCX 简历文件，或直接粘贴简历正文。提取完成后可继续修改，确认无误后再保存为简历档案。"></textarea>
+          </div>
+          <div class="resume-length-warning" id="resumeLengthWarning" role="alert"></div>
+          <p class="hint">文件将在本地解析，不会上传原始简历文件。</p>
+          <p class="hint">建议只上传求职所需内容。请不要上传身份证号、银行卡号、家庭住址等无关敏感信息。</p>
+          <div class="ops">
+            <button class="primary-btn" type="button" onclick="saveResumeProfile()">保存为简历档案</button>
+            <button class="plain-btn" type="button" onclick="hideProfileEditor()">取消</button>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-head">
           <div>
             <h2>岗位匹配分析</h2>
-            <p class="hint">请粘贴可复制的简历正文和目标岗位 JD。当前版本使用文本模型分析，不支持自动识别图片、截图或 PDF 文件。</p>
+            <p class="hint" id="analyzeHint">请先创建简历档案，再确认岗位 JD 文本。简历文件可在本地解析，岗位截图当前不做 OCR。</p>
           </div>
           <button class="secondary-btn" type="button" onclick="fillExample()">填入示例</button>
         </div>
-
-        <div class="form-grid">
-          <div class="field">
-            <label for="resumeInput">简历文本 <span class="count" id="resumeCount">0 字</span></label>
-            <textarea id="resumeInput" placeholder="粘贴你的简历文本。建议先从 PDF、Word 或网页简历中复制正文，再放到这里。内容可包含：教育背景、项目经历、实习经历、技能、证书、求职方向。"></textarea>
-          </div>
-          <div class="field">
-            <label for="jdInput">岗位 JD <span class="count" id="jdCount">0 字</span></label>
-            <textarea id="jdInput" placeholder="粘贴目标岗位 JD。建议包含：岗位职责、任职要求、加分项、业务方向。"></textarea>
-          </div>
+        <div class="flow-steps" aria-label="主流程步骤">
+          <span>1 创建简历档案</span>
+          <span>2 确认岗位 JD</span>
+          <span>3 选择 AI 模式</span>
+          <span>4 生成求职分析包</span>
         </div>
 
-        <div class="key-row">
-          <input id="apiKeyInput" type="password" placeholder="可选：输入 DeepSeek 文本 API Key。留空则使用 Mock 兜底演示。">
-          <button class="plain-btn" type="button" onclick="saveApiKey()">保存 Key</button>
+        <div class="job-draft">
+          <section class="job-method">
+            <h3><span class="method-tag">推荐</span>粘贴 JD 文本</h3>
+            <p class="hint">推荐：直接复制粘贴岗位 JD 文本，识别最稳定。</p>
+            <p class="hint">岗位截图或 JD 文本请尽量只包含岗位职责、任职要求、薪资城市等信息，不要上传无关聊天记录或私人信息。</p>
+            <div class="field">
+              <label for="jdInput">JD 文本确认区 <span class="count" id="jdCount">0 字</span></label>
+              <textarea id="jdInput" placeholder="请粘贴或确认岗位 JD 文本。最终分析只使用这里已确认的 JD 文本，并结合下方手动补充信息。"></textarea>
+            </div>
+            <div class="ops confirm-row">
+              <button class="primary-btn" id="confirmJdBtn" type="button" onclick="confirmJobDraft()">确认 JD 文本</button>
+              <span class="confirm-badge bad" id="jdConfirmBadge">JD 未确认</span>
+            </div>
+          </section>
+
+          <section class="job-method">
+            <h3>上传岗位截图</h3>
+            <p class="hint">请不要上传超长截图。建议每张截图只包含一个屏幕内的岗位内容，文字清晰，不要拼接长图。超长截图、模糊截图或文字过小可能导致识别失败。</p>
+            <div class="screenshot-upload">
+              <input id="jobScreenshotInput" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+              <button class="plain-btn" type="button" onclick="clearJobScreenshots()">清空截图</button>
+            </div>
+            <p class="hint">最多 5 张；单张不超过 5MB；高度不超过 2500px；仅支持 jpg / jpeg / png / webp，不支持 PDF、Word 或其他文件。</p>
+            <div class="status" id="screenshotStatus">当前版本暂不自动识别截图文字，请复制岗位 JD 文本粘贴到上方确认区。后续可接入 OCR / 多模态识别。</div>
+            <div class="screenshot-list" id="screenshotList"></div>
+          </section>
+
+          <section class="job-method">
+            <h3>手动补充岗位信息</h3>
+            <p class="hint">截图或 JD 文本不完整时，可以补充关键条件。确认 JD 后，这些信息会一起进入岗位分析。</p>
+            <div class="manual-grid">
+              <div class="field"><label for="jobCompanyName">公司名</label><input id="jobCompanyName" placeholder="例如：某某科技"></div>
+              <div class="field"><label for="jobTitle">岗位名</label><input id="jobTitle" placeholder="例如：AI 产品助理"></div>
+              <div class="field"><label for="jobCity">城市</label><input id="jobCity" placeholder="例如：上海 / 远程"></div>
+              <div class="field"><label for="jobSalaryRange">薪资范围</label><input id="jobSalaryRange" placeholder="例如：8-12K"></div>
+              <div class="field"><label for="jobEducationRequirement">学历要求</label><input id="jobEducationRequirement" placeholder="例如：本科及以上"></div>
+              <div class="field"><label for="jobExperienceRequirement">经验要求</label><input id="jobExperienceRequirement" placeholder="例如：应届 / 1 年以内"></div>
+              <div class="field"><label for="jobTravelRequirement">是否出差</label><input id="jobTravelRequirement" placeholder="例如：不出差 / 偶尔出差"></div>
+              <div class="field"><label for="jobWorkSchedule">作息信息</label><input id="jobWorkSchedule" placeholder="例如：双休 / 弹性工作"></div>
+              <div class="field wide compact"><label for="jobExtraNotes">其他补充说明</label><textarea id="jobExtraNotes" placeholder="补充岗位亮点、限制、业务方向或你担心的信息。"></textarea></div>
+            </div>
+            <div class="ops">
+              <button class="secondary-btn" type="button" onclick="syncManualJobInfoToJd()">将手动信息写入 JD 文本确认区</button>
+            </div>
+          </section>
         </div>
-        <p class="hint">安全提示：API Key 只建议在本地演示时输入，不要写进代码仓库或公开页面。</p>
+
+        <section class="job-method" id="aiModePanel">
+          <h3>AI 模式</h3>
+          <p class="hint">选择本次生成求职分析包的模式。当前版本只有本地演示模式真正执行分析，自带 Key 和平台 AI 尚未开放真实模型调用。</p>
+          <div class="ai-mode-grid">
+            <button class="ai-mode-card" id="modeCardMock" type="button" onclick="selectAiMode('mock')">
+              <strong>本地演示模式</strong>
+              <span>当前使用本地规则 / Mock 分析，适合体验流程，不消耗 API 额度。</span>
+            </button>
+            <button class="ai-mode-card" id="modeCardOwnApi" type="button" onclick="selectAiMode('own_api')">
+              <strong>自带 API Key 模式</strong>
+              <span>API Key 仅保存在本地；当前版本尚未启用真实自带 Key 调用。</span>
+            </button>
+            <button class="ai-mode-card" id="modeCardPlatformApi" type="button" onclick="selectAiMode('platform_api')">
+              <strong>平台 AI 模式</strong>
+              <span>安全与额度闭环测试中，当前暂未开放，不调用平台模型或扣减额度。</span>
+            </button>
+          </div>
+          <div class="mode-detail" id="modeDetailMock">
+            <strong>当前模式：本地演示模式</strong>
+            <p class="hint">不需要登录，不需要 API Key。系统会继续使用当前已有的本地规则 / Mock 分析生成完整求职包。</p>
+          </div>
+          <div class="mode-detail" id="modeDetailOwnApi">
+            <strong>当前模式：自带 API Key 模式</strong>
+            <p class="hint">API Key 仅保存在当前浏览器本地，不上传服务器、不写入 Supabase、不写入 URL。当前版本尚未启用真实自带 Key 调用，保存 Key 后仍只生成本地演示分析。</p>
+            <section id="apiKeyPanel">
+              <div class="field">
+                <label for="apiKeyInput">API Key</label>
+                <input id="apiKeyInput" type="password" autocomplete="off" placeholder="粘贴你的 API Key，仅保存到当前浏览器">
+              </div>
+              <p class="hint">请不要填写公司、团队或他人账号的敏感 API Key。保存后只会脱敏显示。</p>
+              <div class="ops">
+                <button class="secondary-btn" type="button" onclick="saveApiKey()">保存 API Key</button>
+                <button class="plain-btn" type="button" onclick="clearApiKey()">清除 API Key</button>
+              </div>
+              <div class="status" id="apiKeyStatus">未保存 API Key。</div>
+            </section>
+          </div>
+          <div class="mode-detail" id="modeDetailPlatformApi">
+            <strong>当前模式：平台 AI 模式</strong>
+            <p class="hint">平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型、不会创建订单，也不会扣减额度。</p>
+            <ul class="mode-rules">
+              <li>登录后赠送 3 次免费额度。</li>
+              <li>免费次数用完后，5 元购买 15 次完整求职分析额度。</li>
+              <li>每 1 次额度可生成 1 份完整求职分析包。</li>
+            </ul>
+            <div class="status error" id="platformAiAccessStatus">平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。</div>
+            <div class="ops">
+              <button class="secondary-btn" type="button" onclick="goToLoginPanel()">去登录</button>
+              <button class="secondary-btn" type="button" onclick="showPlatformAiRules()">查看平台 AI 额度规则</button>
+            </div>
+          </div>
+          <div class="status" id="aiModeStatus">当前模式：本地演示模式。</div>
+        </section>
+
+        <section class="job-method" id="accountPanel">
+          <h3>账号登录与平台额度</h3>
+          <p class="hint">登录后可查看预留的平台额度信息。平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度；本地演示模式不强制登录。</p>
+          <div class="auth-box">
+            <div class="field">
+              <label for="loginEmailInput">邮箱登录</label>
+              <input id="loginEmailInput" type="email" autocomplete="email" placeholder="输入邮箱，发送 Magic Link / 邮箱验证码">
+            </div>
+            <div class="auth-actions">
+              <button class="secondary-btn" type="button" onclick="openLoginPanel()">打开登录区域</button>
+              <button class="primary-btn" type="button" onclick="sendLoginLink()">发送登录邮件</button>
+              <button class="plain-btn" type="button" onclick="logoutUser()">退出登录</button>
+            </div>
+            <div class="status" id="authStatus">登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。</div>
+          </div>
+          <div class="quota-summary" id="quotaSummary">
+            <div class="quota-pill"><strong>3</strong><span>免费总次数</span></div>
+            <div class="quota-pill"><strong>0</strong><span>已使用免费次数</span></div>
+            <div class="quota-pill"><strong>3</strong><span>剩余免费次数</span></div>
+            <div class="quota-pill"><strong>0</strong><span>付费剩余额度</span></div>
+          </div>
+          <div class="status" id="quotaStatus">平台 AI 尚未正式开放；登录后仅展示预留额度信息，当前不会调用平台模型或扣减额度。</div>
+        </section>
 
         <div class="ops">
           <button class="primary-btn" id="analyzeBtn" type="button" onclick="runAnalyze()">开始分析</button>
@@ -487,30 +997,139 @@ textarea:focus, input:focus { border-color: var(--line-strong); box-shadow: 0 0 
         </div>
         <div class="history-list" id="historyList"></div>
       </section>
+      <section class="panel" id="jobRecordsPanel">
+        <div class="panel-head">
+          <div>
+            <h3>求职记录</h3>
+            <p class="hint">保存完整分析包摘要，不保存完整简历原文。</p>
+          </div>
+          <button class="mini-btn" type="button" onclick="clearJobRecords()">清空</button>
+        </div>
+        <div class="history-list" id="jobRecordsList"></div>
+      </section>
+      <section class="panel" id="localDataPanel">
+        <div class="panel-head">
+          <div>
+            <h3>本地数据管理</h3>
+            <p class="hint">只管理当前浏览器中和简岗配 AI 相关的数据。</p>
+          </div>
+        </div>
+        <div class="data-status-list" id="localDataStatus"></div>
+        <div class="ops">
+          <button class="mini-btn" type="button" onclick="clearResumeProfileData()">清空简历档案</button>
+          <button class="mini-btn" type="button" onclick="clearJobDraftData()">清空岗位草稿</button>
+          <button class="mini-btn" type="button" onclick="clearJobRecords()">清空求职记录</button>
+          <button class="mini-btn" type="button" onclick="clearApiKey()">清除 API Key</button>
+          <button class="danger-btn" type="button" onclick="clearAllLocalData()">一键清空全部本地数据</button>
+        </div>
+      </section>
+      <section class="panel" id="analyticsPanel">
+        <div class="panel-head">
+          <div>
+            <h3>产品数据看板</h3>
+            <p class="hint">当前展示本地匿名事件统计。正式线上访问数据以后以 Cloudflare Web Analytics 和 Supabase 后台为准。</p>
+          </div>
+        </div>
+        <div class="data-status-list" id="analyticsDashboard"></div>
+        <div class="analytics-note">埋点只记录匿名行为和区间信息，不记录简历原文、完整 JD、API Key 或截图内容。</div>
+      </section>
+      <section class="panel" id="siteFeedbackPanel">
+        <div class="panel-head">
+          <div>
+            <h3>反馈</h3>
+            <p class="hint">用于记录体验问题、分析不准或功能建议。联系方式可不填。</p>
+          </div>
+        </div>
+        <div class="field">
+          <label for="siteFeedbackType">反馈类型</label>
+          <select id="siteFeedbackType">
+            <option value="体验问题">体验问题</option>
+            <option value="分析不准">分析不准</option>
+            <option value="功能建议">功能建议</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="field compact">
+          <label for="siteFeedbackText">反馈内容</label>
+          <textarea id="siteFeedbackText" placeholder="请描述你遇到的问题或建议。不要填写身份证、银行卡、完整简历、完整 JD 或 API Key。"></textarea>
+        </div>
+        <div class="field">
+          <label for="siteFeedbackContact">可选联系方式</label>
+          <input id="siteFeedbackContact" placeholder="可不填；当前只记录是否填写，不保存具体联系方式。">
+        </div>
+        <p class="hint">请不要在反馈里填写身份证、银行卡、完整简历、API Key 等敏感信息。默认未配置 Supabase 时，反馈只保存到当前浏览器本地。</p>
+        <div class="ops">
+          <button class="secondary-btn" type="button" onclick="submitSiteFeedback()">提交反馈</button>
+        </div>
+      </section>
       <section class="notice">
-        AI 输出仅供求职准备参考。当前版本只分析用户粘贴的文本，不读取图片、截图或 PDF 文件；建议结合岗位真实要求、个人经历和人工判断进行二次修改。
+        AI 输出仅供求职准备参考。TXT、PDF、DOCX 文件只在当前浏览器本地解析，原始文件不会上传；只有用户主动开始分析后，系统才使用已确认的简历正文和岗位 JD。
       </section>
     </aside>
   </section>
 
-  <p class="footer">简历分析 · AI 简历-JD 匹配工具 · 支持 GitHub Pages 部署</p>
+  <p class="footer" id="releaseFooter">简岗配 AI · 正在读取版本信息</p>
 </main>
 
 <script>
 const STORAGE = {
-  apiKey: 'jian_gang_pei_api_key',
+  apiKey: 'userApiKey',
+  legacyApiKey: 'jian_gang_pei_api_key',
+  resumeProfile: 'resumeProfile',
+  jobDraft: 'jobDraft',
+  jobRecords: 'jobRecords',
   history: 'jian_gang_pei_history',
-  feedback: 'jian_gang_pei_feedback'
+  feedback: 'jian_gang_pei_feedback',
+  anonymousUserId: 'anonymousUserId',
+  analyticsQueue: 'analyticsQueue',
+  feedbackRecords: 'feedbackRecords',
+  aiMode: 'aiMode'
 };
-// 部署 Cloudflare Worker 后，把这里替换成你的 Worker 地址，例如：
-// const WORKER_API_URL = 'https://jian-gang-pei-api.your-name.workers.dev/analyze';
-const WORKER_API_URL = 'https://late-hall-c73cjian-gang-pei-api.sozowali642.workers.dev';
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
-const MODEL = 'deepseek-chat';
+
+const ANALYTICS_CONFIG = {
+  SUPABASE_URL: 'https://cesppeysiuvdwfcronmq.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_2IfCKNP3pmJla2g4fAF18A_16j_A1Lm',
+  ENABLE_SUPABASE_ANALYTICS: true
+};
+
+const SUPABASE_AUTH_CONFIG = {
+  SUPABASE_URL: 'https://cesppeysiuvdwfcronmq.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_2IfCKNP3pmJla2g4fAF18A_16j_A1Lm',
+  ENABLE_SUPABASE_AUTH: true
+};
+
+const RELEASE_CONFIG = Object.freeze({
+  VERSION: 'v0.8.6-alpha',
+  MODE_SUMMARY: '本地演示开放；自带 Key 与平台 AI 暂未开放真实调用',
+  UPDATED_AT: '2026-07-14'
+});
+
+const PLATFORM_AI_CONFIG = {
+  PLATFORM_WORKER_BASE_URL: 'https://late-hall-c73cjian-gang-pei-api.sozowali642.workers.dev',
+  PLATFORM_ANALYZE_PATH: '/api/platform-analyze',
+  ENABLE_PLATFORM_AI: false
+};
+
+const RESUME_IMPORT_CONFIG = {
+  MAX_FILE_BYTES: 10 * 1024 * 1024,
+  PLATFORM_RESUME_CHAR_LIMIT: 12000,
+  PDFJS_VERSION: '3.11.174',
+  PDFJS_URL: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  PDFJS_WORKER_URL: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+  MAMMOTH_VERSION: '1.10.0',
+  MAMMOTH_URL: 'https://cdn.jsdelivr.net/npm/mammoth@1.10.0/mammoth.browser.min.js'
+};
+
+const resumeLibraryLoads = {};
 
 let currentResult = null;
 let currentRecordId = null;
 let feedbackChoice = '';
+let hasTrackedStartAnalysis = false;
+let lastJdTrackAt = 0;
+let supabaseAuthClient = null;
+let currentAuthSession = null;
+let currentQuota = null;
 
 const $ = (id) => document.getElementById(id);
 const resumeInput = $('resumeInput');
@@ -521,6 +1140,41 @@ const progressBox = $('progressBox');
 const resultPanel = $('resultPanel');
 const resultContent = $('resultContent');
 const analyzeBtn = $('analyzeBtn');
+const profileView = $('profileView');
+const profileEditor = $('profileEditor');
+const resumeFileInput = $('resumeFileInput');
+const resumeFileMeta = $('resumeFileMeta');
+const resumeFileStatus = $('resumeFileStatus');
+const resumeLengthWarning = $('resumeLengthWarning');
+const analyzeHint = $('analyzeHint');
+const jobScreenshotInput = $('jobScreenshotInput');
+const screenshotList = $('screenshotList');
+const screenshotStatus = $('screenshotStatus');
+const jdConfirmBadge = $('jdConfirmBadge');
+const jobRecordsList = $('jobRecordsList');
+const apiKeyStatus = $('apiKeyStatus');
+const localDataStatus = $('localDataStatus');
+const analyticsDashboard = $('analyticsDashboard');
+const siteFeedbackType = $('siteFeedbackType');
+const siteFeedbackText = $('siteFeedbackText');
+const siteFeedbackContact = $('siteFeedbackContact');
+const aiModeStatus = $('aiModeStatus');
+const platformAiAccessStatus = $('platformAiAccessStatus');
+const loginEmailInput = $('loginEmailInput');
+const authStatus = $('authStatus');
+const quotaStatus = $('quotaStatus');
+const quotaSummary = $('quotaSummary');
+const JOB_MANUAL_FIELDS = [
+  ['companyName', 'jobCompanyName', '公司名'],
+  ['jobTitle', 'jobTitle', '岗位名'],
+  ['city', 'jobCity', '城市'],
+  ['salaryRange', 'jobSalaryRange', '薪资范围'],
+  ['educationRequirement', 'jobEducationRequirement', '学历要求'],
+  ['experienceRequirement', 'jobExperienceRequirement', '经验要求'],
+  ['travelRequirement', 'jobTravelRequirement', '是否出差'],
+  ['workSchedule', 'jobWorkSchedule', '作息信息'],
+  ['extraNotes', 'jobExtraNotes', '其他补充说明']
+];
 
 const exampleCases = [
 {
@@ -800,47 +1454,1381 @@ const exampleCases = [
 
 init();
 function init() {
-  apiKeyInput.value = localStorage.getItem(STORAGE.apiKey) || '';
+  migrateLegacyApiKey();
+  renderReleaseInfo();
+  getAnonymousUserId();
+  trackEvent('visit_site', { metadata: { page: 'index' } });
+  apiKeyInput.value = '';
+  hydrateJobDraft();
   resumeInput.addEventListener('input', updateCounts);
-  jdInput.addEventListener('input', updateCounts);
+  jdInput.addEventListener('input', handleJdTextChange);
+  resumeFileInput.addEventListener('change', handleResumeFile);
+  jobScreenshotInput.addEventListener('change', handleJobScreenshotUpload);
+  const analyzerSection = $('analyzer');
+  if (analyzerSection) {
+    analyzerSection.addEventListener('click', trackStartAnalysisArea, { once: true });
+    analyzerSection.addEventListener('focusin', trackStartAnalysisArea, { once: true });
+  }
+  JOB_MANUAL_FIELDS.forEach(([, id]) => {
+    const el = $(id);
+    if (el) el.addEventListener('input', handleManualJobChange);
+  });
+  renderResumeProfile();
   renderHistory();
+  renderJobRecords();
+  renderApiKeyState();
+  renderAiModeState();
+  renderLocalDataStatus();
+  renderAnalyticsDashboard();
+  initAuthModule();
   updateCounts();
+}
+function renderReleaseInfo() {
+  const footer = $('releaseFooter');
+  if (!footer) return;
+  footer.textContent = `简岗配 AI · ${RELEASE_CONFIG.VERSION} · ${RELEASE_CONFIG.MODE_SUMMARY} · 更新于 ${RELEASE_CONFIG.UPDATED_AT}`;
 }
 function updateCounts() {
   $('resumeCount').textContent = `${resumeInput.value.length} 字`;
   $('jdCount').textContent = `${jdInput.value.length} 字`;
+  renderResumeLengthWarning();
 }
 function scrollToAnalyzer() {
+  trackStartAnalysisArea();
   $('analyzer').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function setStatus(text, type = '') {
   statusBox.textContent = text;
   statusBox.className = `status ${type}`.trim();
 }
+function migrateLegacyApiKey() {
+  const current = localStorage.getItem(STORAGE.apiKey);
+  const legacy = localStorage.getItem(STORAGE.legacyApiKey);
+  if (!current && legacy) localStorage.setItem(STORAGE.apiKey, legacy);
+  if (legacy) localStorage.removeItem(STORAGE.legacyApiKey);
+}
+function getUserApiKey() {
+  return localStorage.getItem(STORAGE.apiKey) || '';
+}
+function getAiMode() {
+  const mode = localStorage.getItem(STORAGE.aiMode);
+  if (['mock', 'own_api', 'platform_api'].includes(mode)) return mode;
+  localStorage.setItem(STORAGE.aiMode, 'mock');
+  return 'mock';
+}
+function selectAiMode(mode, source = 'mode_switch') {
+  if (!['mock', 'own_api', 'platform_api'].includes(mode)) return;
+  localStorage.setItem(STORAGE.aiMode, mode);
+  renderAiModeState();
+  renderLocalDataStatus();
+  const eventMap = {
+    mock: 'switch_to_mock',
+    own_api: 'switch_to_own_api',
+    platform_api: 'switch_to_platform_api'
+  };
+  trackEvent(eventMap[mode], {
+    metadata: {
+      aiMode: mode,
+      hasApiKey: Boolean(getUserApiKey()),
+      source
+    }
+  });
+}
+function renderAiModeState() {
+  const mode = getAiMode();
+  const cards = {
+    mock: $('modeCardMock'),
+    own_api: $('modeCardOwnApi'),
+    platform_api: $('modeCardPlatformApi')
+  };
+  const details = {
+    mock: $('modeDetailMock'),
+    own_api: $('modeDetailOwnApi'),
+    platform_api: $('modeDetailPlatformApi')
+  };
+  Object.entries(cards).forEach(([key, el]) => {
+    if (!el) return;
+    el.classList.toggle('active', key === mode);
+    el.setAttribute('aria-pressed', key === mode ? 'true' : 'false');
+  });
+  Object.entries(details).forEach(([key, el]) => {
+    if (el) el.classList.toggle('visible', key === mode);
+  });
+  if (aiModeStatus) {
+    const statusText = {
+      mock: '当前模式：本地演示模式。将使用本地规则 / Mock 分析，不消耗 API。',
+      own_api: getUserApiKey()
+        ? `当前模式：自带 API Key 模式。已保存 ${maskApiKey(getUserApiKey())}，当前版本尚未启用真实自带 Key 调用，本次仍生成本地演示分析。`
+        : '当前模式：自带 API Key 模式。当前版本尚未启用真实调用；如需体验流程，请切换到本地演示模式。',
+      platform_api: !PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI
+        ? '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。'
+        : platformWorkerConfigured()
+          ? '当前模式：平台 AI 模式。已配置 Worker，分析时将由 Worker 校验登录、额度和限流后调用平台 AI。'
+          : '当前模式：平台 AI 模式。后端 Worker 尚未配置，当前不会调用平台模型。'
+    };
+    aiModeStatus.textContent = statusText[mode];
+    const unavailable = (mode === 'own_api' && !getUserApiKey()) ||
+      (mode === 'platform_api' && !PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI);
+    aiModeStatus.className = `status ${unavailable ? 'error' : ''}`.trim();
+  }
+  renderPlatformAiAccessState();
+}
+function maskApiKey(key) {
+  if (!key) return '';
+  const prefix = key.startsWith('sk-') ? 'sk-' : key.slice(0, Math.min(3, key.length));
+  const suffix = key.slice(-4);
+  return `${prefix}****${suffix}`;
+}
+function renderApiKeyState() {
+  const key = getUserApiKey();
+  if (!apiKeyStatus) return;
+  apiKeyStatus.textContent = key ? `已保存 API Key（仅本地浏览器）：${maskApiKey(key)}` : '未保存 API Key。';
+  apiKeyStatus.className = `status ${key ? 'success' : ''}`.trim();
+}
+function renderLocalDataStatus() {
+  if (!localDataStatus) return;
+  const profile = getResumeProfile();
+  const draft = getJobDraft();
+  const records = getJobRecords();
+  const hasDraft = Boolean(draft.jdText || draft.screenshotFiles.length || buildManualJobText());
+  const hasKey = Boolean(getUserApiKey());
+  const items = [
+    ['简历档案 resumeProfile', profile ? '已保存' : '未保存'],
+    ['岗位草稿 jobDraft', hasDraft ? '已保存' : '未保存'],
+    ['求职记录 jobRecords', `${records.length} 条`],
+    ['自带 API Key userApiKey', hasKey ? '已保存' : '未保存'],
+    ['AI 模式 aiMode', getAiMode()]
+  ];
+  localDataStatus.innerHTML = items.map(([label, value]) => `
+    <div class="data-status-item"><span>${label}</span><strong>${value}</strong></div>
+  `).join('');
+}
+function authConfigured() {
+  return Boolean(
+    SUPABASE_AUTH_CONFIG.ENABLE_SUPABASE_AUTH &&
+    SUPABASE_AUTH_CONFIG.SUPABASE_URL &&
+    SUPABASE_AUTH_CONFIG.SUPABASE_ANON_KEY
+  );
+}
+function platformWorkerConfigured() {
+  return Boolean(
+    PLATFORM_AI_CONFIG.PLATFORM_WORKER_BASE_URL &&
+    PLATFORM_AI_CONFIG.PLATFORM_ANALYZE_PATH
+  );
+}
+async function initAuthModule() {
+  renderAuthState();
+  renderQuotaState();
+  renderPlatformAiAccessState();
+  if (!authConfigured()) return;
+  try {
+    const client = await getSupabaseAuthClient();
+    if (!client) return;
+    const { data } = await client.auth.getSession();
+    currentAuthSession = data?.session || null;
+    renderAuthState();
+    if (currentAuthSession) await loadUserQuota('session_restore');
+    client.auth.onAuthStateChange(async (event, session) => {
+      currentAuthSession = session || null;
+      renderAuthState();
+      if (event === 'SIGNED_IN' && session) {
+        trackEvent('login_success', { metadata: authEventMetadata('auth_state') });
+        await loadUserQuota('login_success');
+      }
+      if (event === 'SIGNED_OUT') {
+        currentQuota = null;
+        renderQuotaState();
+        renderPlatformAiAccessState();
+      }
+    });
+  } catch (err) {
+    if (authStatus) {
+      authStatus.textContent = `登录模块初始化失败：${err.message || '未知错误'}。当前可继续使用本地演示模式或自带 API Key 模式。`;
+      authStatus.className = 'status error';
+    }
+  }
+}
+async function getSupabaseAuthClient() {
+  if (!authConfigured()) return null;
+  if (supabaseAuthClient) return supabaseAuthClient;
+  if (!window.supabase) await loadSupabaseSdk();
+  if (!window.supabase?.createClient) throw new Error('Supabase JS SDK 未加载');
+  supabaseAuthClient = window.supabase.createClient(
+    SUPABASE_AUTH_CONFIG.SUPABASE_URL,
+    SUPABASE_AUTH_CONFIG.SUPABASE_ANON_KEY
+  );
+  return supabaseAuthClient;
+}
+function loadSupabaseSdk() {
+  return new Promise((resolve, reject) => {
+    if (window.supabase?.createClient) return resolve();
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Supabase JS SDK 加载失败'));
+    document.head.appendChild(script);
+  });
+}
+function openLoginPanel() {
+  trackEvent('login_opened', { metadata: authEventMetadata('login_panel') });
+  $('accountPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  loginEmailInput?.focus();
+  if (!authConfigured() && authStatus) {
+    authStatus.textContent = '登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。';
+    authStatus.className = 'status';
+  }
+}
+function goToLoginPanel() {
+  openLoginPanel();
+}
+async function sendLoginLink() {
+  openLoginPanel();
+  const email = loginEmailInput?.value.trim() || '';
+  if (!authConfigured()) {
+    trackEvent('login_failed', { metadata: authEventMetadata('auth_not_configured') });
+    setAuthMessage('登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。', 'error');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    trackEvent('login_failed', { metadata: authEventMetadata('invalid_email') });
+    setAuthMessage('请填写有效邮箱，再发送登录邮件。', 'error');
+    return;
+  }
+  try {
+    const client = await getSupabaseAuthClient();
+    const { error } = await client.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.href.split('#')[0] }
+    });
+    if (error) throw error;
+    setAuthMessage(`登录邮件已发送到 ${maskEmail(email)}，请在邮箱中确认。`, 'success');
+  } catch (err) {
+    trackEvent('login_failed', { metadata: authEventMetadata('send_magic_link') });
+    setAuthMessage(`登录邮件发送失败：${err.message || '未知错误'}`, 'error');
+  }
+}
+async function logoutUser() {
+  if (!authConfigured()) {
+    setAuthMessage('登录功能尚未配置，无需退出。', 'error');
+    return;
+  }
+  try {
+    const client = await getSupabaseAuthClient();
+    const { error } = await client.auth.signOut();
+    if (error) throw error;
+    currentAuthSession = null;
+    currentQuota = null;
+    renderAuthState();
+    renderQuotaState();
+    renderPlatformAiAccessState();
+    trackEvent('logout_success', { metadata: authEventMetadata('logout') });
+    setAuthMessage('已退出登录。', 'success');
+  } catch (err) {
+    setAuthMessage(`退出登录失败：${err.message || '未知错误'}`, 'error');
+  }
+}
+function setAuthMessage(text, type = '') {
+  if (!authStatus) return;
+  authStatus.textContent = text;
+  authStatus.className = `status ${type}`.trim();
+}
+function renderAuthState() {
+  if (!authStatus) return;
+  if (!authConfigured()) {
+    authStatus.textContent = '登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。';
+    authStatus.className = 'status';
+    return;
+  }
+  const email = currentAuthSession?.user?.email || '';
+  authStatus.textContent = email
+    ? `已登录：${maskEmail(email)}。额度信息从 Supabase user_quota 读取；平台 AI 尚未正式开放。`
+    : '未登录。登录后可查看预留额度信息；平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度。';
+  authStatus.className = `status ${email ? 'success' : ''}`.trim();
+}
+async function loadUserQuota(source = 'quota_view') {
+  if (!authConfigured() || !currentAuthSession?.user?.id) {
+    currentQuota = null;
+    renderQuotaState();
+    renderPlatformAiAccessState();
+    return null;
+  }
+  try {
+    const client = await getSupabaseAuthClient();
+    const userId = currentAuthSession.user.id;
+    const { data, error } = await client
+      .from('user_quota')
+      .select('user_id, platform_free_total, platform_free_used, platform_paid_credits, created_at, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) {
+      currentQuota = normalizeQuota(data);
+      renderQuotaState();
+      renderPlatformAiAccessState();
+      trackEvent('quota_loaded', { metadata: quotaEventMetadata(source) });
+      return currentQuota;
+    }
+    return await initializeUserQuota(source);
+  } catch (err) {
+    currentQuota = null;
+    renderQuotaState(`额度读取失败：${err.message || '未知错误'}。本阶段不会扣减额度。`, 'error');
+    renderPlatformAiAccessState();
+    return null;
+  }
+}
+async function initializeUserQuota(source = 'quota_init') {
+  const userId = currentAuthSession?.user?.id;
+  if (!authConfigured() || !userId) return null;
+  try {
+    const client = await getSupabaseAuthClient();
+    const payload = {
+      user_id: userId,
+      platform_free_total: 3,
+      platform_free_used: 0,
+      platform_paid_credits: 0
+    };
+    const { data, error } = await client
+      .from('user_quota')
+      .insert(payload)
+      .select('user_id, platform_free_total, platform_free_used, platform_paid_credits, created_at, updated_at')
+      .single();
+    if (error) throw error;
+    currentQuota = normalizeQuota(data || payload);
+    renderQuotaState();
+    renderPlatformAiAccessState();
+    trackEvent('quota_initialized', { metadata: quotaEventMetadata(source) });
+    return currentQuota;
+  } catch (err) {
+    currentQuota = normalizeQuota({ platform_free_total: 3, platform_free_used: 0, platform_paid_credits: 0 });
+    renderQuotaState('额度初始化失败，请检查 Supabase RLS。当前仅展示默认规则，不会扣减额度。', 'error');
+    renderPlatformAiAccessState();
+    return currentQuota;
+  }
+}
+function normalizeQuota(quota = {}) {
+  return {
+    platform_free_total: Number(quota.platform_free_total ?? 3),
+    platform_free_used: Number(quota.platform_free_used ?? 0),
+    platform_paid_credits: Number(quota.platform_paid_credits ?? 0)
+  };
+}
+function getQuotaSnapshot() {
+  const quota = normalizeQuota(currentQuota || {});
+  const freeRemaining = Math.max(0, quota.platform_free_total - quota.platform_free_used);
+  return { ...quota, freeRemaining };
+}
+function renderQuotaState(message = '', type = '') {
+  const quota = getQuotaSnapshot();
+  if (quotaSummary) {
+    quotaSummary.innerHTML = `
+      <div class="quota-pill"><strong>${quota.platform_free_total}</strong><span>免费总次数</span></div>
+      <div class="quota-pill"><strong>${quota.platform_free_used}</strong><span>已使用免费次数</span></div>
+      <div class="quota-pill"><strong>${quota.freeRemaining}</strong><span>剩余免费次数</span></div>
+      <div class="quota-pill"><strong>${quota.platform_paid_credits}</strong><span>付费剩余额度</span></div>
+    `;
+  }
+  if (!quotaStatus) return;
+  if (message) {
+    quotaStatus.textContent = message;
+    quotaStatus.className = `status ${type}`.trim();
+    return;
+  }
+  if (!authConfigured()) {
+    quotaStatus.textContent = 'Supabase Auth 未配置时，额度仅展示产品规则，不读取数据库。';
+    quotaStatus.className = 'status';
+    return;
+  }
+  if (!currentAuthSession) {
+    quotaStatus.textContent = '未登录。登录后可查看预留额度信息；平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度。';
+    quotaStatus.className = 'status';
+    return;
+  }
+  quotaStatus.textContent = `额度已加载：免费剩余 ${quota.freeRemaining} 次，付费剩余 ${quota.platform_paid_credits} 次。平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度。`;
+  quotaStatus.className = 'status success';
+}
+function renderPlatformAiAccessState() {
+  if (!platformAiAccessStatus) return;
+  if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
+    platformAiAccessStatus.textContent = '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。';
+    platformAiAccessStatus.className = 'status error';
+    return;
+  }
+  if (!authConfigured()) {
+    platformAiAccessStatus.textContent = '登录功能尚未配置，平台 AI 仅展示规则。当前可继续使用本地演示模式或自带 API Key 模式。';
+    platformAiAccessStatus.className = 'status';
+    return;
+  }
+  if (!currentAuthSession) {
+    platformAiAccessStatus.textContent = '平台 AI 模式需要登录后使用。登录后可免费体验 3 次。';
+    platformAiAccessStatus.className = 'status error';
+    return;
+  }
+  if (!platformWorkerConfigured()) {
+    platformAiAccessStatus.textContent = '平台 AI 后端尚未配置。当前不会调用 DeepSeek，可先使用本地演示模式生成 Mock 分析。';
+    platformAiAccessStatus.className = 'status error';
+    return;
+  }
+  const quota = getQuotaSnapshot();
+  if (quota.freeRemaining > 0) {
+    platformAiAccessStatus.textContent = `你还有 ${quota.freeRemaining} 次免费平台 AI 体验额度。配置 Worker 后，平台 AI 会在 DeepSeek 成功返回后由后端扣减额度。`;
+    platformAiAccessStatus.className = 'status success';
+    trackEvent('platform_api_free_available', { metadata: quotaEventMetadata('mode_status') });
+    return;
+  }
+  if (quota.platform_paid_credits > 0) {
+    platformAiAccessStatus.textContent = `你还有 ${quota.platform_paid_credits} 次平台 AI 付费分析额度。配置 Worker 后，额度扣减只由后端完成。`;
+    platformAiAccessStatus.className = 'status success';
+    return;
+  }
+  platformAiAccessStatus.textContent = '免费次数已用完，后续可 5 元购买 15 次完整求职分析额度。';
+  platformAiAccessStatus.className = 'status error';
+  trackEvent('platform_api_limit_reached', { metadata: quotaEventMetadata('mode_status') });
+}
+function maskEmail(email) {
+  const [name = '', domain = ''] = String(email || '').split('@');
+  if (!domain) return '';
+  return `${name.slice(0, 2)}****@${domain}`;
+}
+function rangeForCredits(value) {
+  const n = Number(value) || 0;
+  if (n <= 0) return '0';
+  if (n <= 3) return '1-3';
+  if (n <= 15) return '4-15';
+  return '15+';
+}
+function authEventMetadata(source) {
+  return {
+    aiMode: getAiMode(),
+    hasSession: Boolean(currentAuthSession),
+    freeRemainingRange: rangeForCredits(getQuotaSnapshot().freeRemaining),
+    paidCreditsRange: rangeForCredits(getQuotaSnapshot().platform_paid_credits),
+    source
+  };
+}
+function quotaEventMetadata(source) {
+  return authEventMetadata(source);
+}
+function confirmAction(message) {
+  return window.confirm(message);
+}
+function getAnonymousUserId() {
+  let id = localStorage.getItem(STORAGE.anonymousUserId);
+  if (id) return id;
+  const randomId = window.crypto?.randomUUID
+    ? window.crypto.randomUUID()
+    : `anon_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  id = `anon_${randomId}`;
+  localStorage.setItem(STORAGE.anonymousUserId, id);
+  return id;
+}
+function analyticsEnabled() {
+  return Boolean(
+    ANALYTICS_CONFIG.ENABLE_SUPABASE_ANALYTICS &&
+    ANALYTICS_CONFIG.SUPABASE_URL &&
+    ANALYTICS_CONFIG.SUPABASE_ANON_KEY
+  );
+}
+function getAnalyticsQueue() {
+  try {
+    const queue = JSON.parse(localStorage.getItem(STORAGE.analyticsQueue) || '[]');
+    return Array.isArray(queue) ? queue : [];
+  } catch {
+    return [];
+  }
+}
+function saveAnalyticsQueue(queue) {
+  localStorage.setItem(STORAGE.analyticsQueue, JSON.stringify(queue.slice(-500)));
+}
+function trackStartAnalysisArea() {
+  if (hasTrackedStartAnalysis) return;
+  hasTrackedStartAnalysis = true;
+  trackEvent('start_analysis', {
+    metadata: {
+      hasResumeProfile: Boolean(getResumeProfile()),
+      hasConfirmedJD: Boolean(getJobDraft().jdConfirmed)
+    }
+  });
+}
+function trackEvent(eventType, options = {}) {
+  try {
+    const event = {
+      anonymous_user_id: getAnonymousUserId(),
+      user_id: null,
+      event_type: eventType,
+      api_mode: options.apiMode || getCurrentApiMode(),
+      job_category: options.jobCategory || null,
+      success: options.success !== false,
+      duration_ms: Number.isFinite(options.durationMs) ? Math.round(options.durationMs) : null,
+      metadata: sanitizeAnalyticsMetadata(options.metadata || {}),
+      created_at: new Date().toISOString()
+    };
+    const queue = getAnalyticsQueue();
+    queue.push(event);
+    saveAnalyticsQueue(queue);
+    renderAnalyticsDashboard();
+    if (analyticsEnabled()) sendUsageEventToSupabase(event);
+  } catch (err) {
+    console.debug('analytics skipped:', err);
+  }
+}
+function sendUsageEventToSupabase(event) {
+  const url = `${ANALYTICS_CONFIG.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/usage_events`;
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: ANALYTICS_CONFIG.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${ANALYTICS_CONFIG.SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal'
+    },
+    body: JSON.stringify(event)
+  }).catch(err => console.debug('supabase analytics skipped:', err));
+}
+function sanitizeAnalyticsMetadata(metadata) {
+  const blockedKeys = new Set([
+    'resumeText', 'fullResume', 'jdText', 'fullJd', 'apiKey', 'userApiKey',
+    'legacyApiKey', 'phone', 'email', 'realName', 'idCard', 'contact',
+    'screenshotBase64', 'imageBase64', 'fileContent', 'imageContent'
+  ]);
+  if (!metadata || typeof metadata !== 'object') return {};
+  return Object.fromEntries(Object.entries(metadata)
+    .filter(([key]) => !blockedKeys.has(key))
+    .map(([key, value]) => [key, sanitizeAnalyticsValue(value)]));
+}
+function sanitizeAnalyticsValue(value) {
+  if (Array.isArray(value)) return value.map(item => sanitizeAnalyticsValue(item)).slice(0, 20);
+  if (value && typeof value === 'object') return sanitizeAnalyticsMetadata(value);
+  if (typeof value === 'string') return sanitizeSensitiveText(value).slice(0, 200);
+  if (['number', 'boolean'].includes(typeof value) || value === null) return value;
+  return String(value || '').slice(0, 80);
+}
+function getCurrentApiMode() {
+  return getAiMode();
+}
+function textLengthBucket(text) {
+  const len = String(text || '').length;
+  if (len <= 500) return '0-500';
+  if (len <= 2000) return '500-2000';
+  return '2000+';
+}
+function fileSizeBucket(bytes) {
+  const size = Number(bytes) || 0;
+  if (size <= 1024 * 1024) return '0-1MB';
+  if (size <= 5 * 1024 * 1024) return '1-5MB';
+  return '5MB+';
+}
+function matchScoreRange(score) {
+  const n = Number(score) || 0;
+  if (n >= 80) return '80-100';
+  if (n >= 65) return '65-79';
+  if (n >= 50) return '50-64';
+  return 'below50';
+}
+function hasManualJobInfo() {
+  return JOB_MANUAL_FIELDS.some(([key]) => Boolean(getJobDraft()[key]));
+}
+function renderAnalyticsDashboard() {
+  if (!analyticsDashboard) return;
+  const queue = getAnalyticsQueue();
+  const count = (type) => queue.filter(event => event.event_type === type).length;
+  const feedbackCount = getFeedbackRecords().length + getFeedback().length;
+  const items = [
+    ['本地访问事件数', count('visit_site')],
+    ['简历档案创建次数', count('resume_profile_created')],
+    ['JD 确认次数', count('jd_text_confirmed')],
+    ['完整求职包生成次数', count('generate_job_package')],
+    ['求职记录保存次数', count('save_job_record')],
+    ['API Key 保存次数', count('api_key_saved')],
+    ['平台 API 付费点击次数', count('click_platform_api_payment')],
+    ['用户反馈条数', feedbackCount]
+  ];
+  analyticsDashboard.innerHTML = items.map(([label, value]) => `
+    <div class="data-status-item"><span>${label}</span><strong>${value}</strong></div>
+  `).join('');
+}
+function trackOwnApiMode() {
+  trackEvent('switch_to_own_api', {
+    metadata: { aiMode: 'own_api', hasApiKey: Boolean(getUserApiKey()), source: 'settings' }
+  });
+}
+function trackPlatformApiMode() {
+  trackEvent('switch_to_platform_api', {
+    metadata: { aiMode: 'platform_api', hasApiKey: Boolean(getUserApiKey()), source: 'settings' }
+  });
+}
+function trackPlatformPaymentClick() {
+  trackEvent('click_platform_api_payment', {
+    metadata: quotaEventMetadata('payment_placeholder')
+  });
+  setStatus('平台 AI 尚未正式开放。当前不会调用平台模型、不会扣减额度，也不会创建订单。', 'success');
+}
+function showPlatformAiRules() {
+  selectAiMode('platform_api', 'payment_placeholder');
+  trackEvent('platform_api_quota_viewed', { metadata: quotaEventMetadata('payment_placeholder') });
+  trackPlatformPaymentClick();
+  const message = [
+    '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。',
+    '当前不会调用平台模型、不会扣减额度，也不会创建订单。',
+    '自带 API Key 模式当前也尚未启用真实调用，可切换到本地演示模式体验流程。',
+    '平台 AI 未来价格：5 元 / 15 次完整求职分析包。'
+  ].join('\n');
+  window.alert(message);
+}
+function createEmptyJobDraft() {
+  const now = new Date().toLocaleString();
+  return {
+    id: String(Date.now()),
+    jdText: '',
+    jdConfirmed: false,
+    sourceType: 'paste',
+    companyName: '',
+    jobTitle: '',
+    city: '',
+    salaryRange: '',
+    educationRequirement: '',
+    experienceRequirement: '',
+    travelRequirement: '',
+    workSchedule: '',
+    extraNotes: '',
+    screenshotFiles: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+function getJobDraft() {
+  try {
+    const draft = JSON.parse(localStorage.getItem(STORAGE.jobDraft) || 'null');
+    return normalizeJobDraft(draft);
+  } catch {
+    return createEmptyJobDraft();
+  }
+}
+function normalizeJobDraft(draft) {
+  const empty = createEmptyJobDraft();
+  if (!draft || typeof draft !== 'object') return empty;
+  return {
+    ...empty,
+    ...draft,
+    jdText: String(draft.jdText || ''),
+    jdConfirmed: Boolean(draft.jdConfirmed),
+    sourceType: ['paste', 'screenshot', 'manual'].includes(draft.sourceType) ? draft.sourceType : 'paste',
+    screenshotFiles: Array.isArray(draft.screenshotFiles) ? draft.screenshotFiles : []
+  };
+}
+function saveJobDraft(patch = {}, render = true) {
+  const current = getJobDraft();
+  const draft = {
+    ...current,
+    ...patch,
+    updatedAt: new Date().toLocaleString()
+  };
+  localStorage.setItem(STORAGE.jobDraft, JSON.stringify(draft));
+  if (render) renderJobDraftState(draft);
+  renderLocalDataStatus();
+  return draft;
+}
+function hydrateJobDraft() {
+  const draft = getJobDraft();
+  jdInput.value = draft.jdText || '';
+  JOB_MANUAL_FIELDS.forEach(([key, id]) => {
+    const el = $(id);
+    if (el) el.value = draft[key] || '';
+  });
+  renderJobDraftState(draft);
+}
+function renderJobDraftState(draft = getJobDraft()) {
+  $('jdCount').textContent = `${jdInput.value.length} 字`;
+  jdConfirmBadge.textContent = draft.jdConfirmed ? 'JD 已确认' : 'JD 未确认';
+  jdConfirmBadge.className = `confirm-badge ${draft.jdConfirmed ? 'ok' : 'bad'}`;
+  renderScreenshotList(draft.screenshotFiles || []);
+}
+function handleJdTextChange() {
+  updateCounts();
+  saveJobDraft({
+    jdText: jdInput.value,
+    jdConfirmed: false,
+    sourceType: 'paste'
+  });
+  const now = Date.now();
+  if (now - lastJdTrackAt > 1200) {
+    lastJdTrackAt = now;
+    trackEvent('paste_jd', {
+      metadata: {
+        lengthBucket: textLengthBucket(jdInput.value)
+      }
+    });
+  }
+}
+function handleManualJobChange() {
+  const patch = { jdConfirmed: false, sourceType: 'manual' };
+  JOB_MANUAL_FIELDS.forEach(([key, id]) => {
+    const el = $(id);
+    patch[key] = el ? el.value.trim() : '';
+  });
+  saveJobDraft(patch);
+}
+function syncManualJobInfoToJd() {
+  const manualText = buildManualJobText();
+  if (!manualText) {
+    setStatus('请先填写至少一项岗位补充信息。', 'error');
+    return;
+  }
+  const currentText = stripManualJobBlock(jdInput.value.trim());
+  jdInput.value = currentText ? `${currentText}\n\n【手动补充岗位信息】\n${manualText}` : `【手动补充岗位信息】\n${manualText}`;
+  updateCounts();
+  saveJobDraft({ jdText: jdInput.value, jdConfirmed: false, sourceType: 'manual' });
+  setStatus('已将手动补充信息写入 JD 文本确认区，请检查后点击“确认 JD 文本”。');
+  jdInput.focus();
+}
+function buildManualJobText() {
+  const draft = getJobDraft();
+  return JOB_MANUAL_FIELDS
+    .map(([key, , label]) => draft[key] ? `${label}：${draft[key]}` : '')
+    .filter(Boolean)
+    .join('\n');
+}
+function getConfirmedJobText() {
+  const draft = getJobDraft();
+  const manualText = buildManualJobText();
+  const baseText = stripManualJobBlock(draft.jdText.trim());
+  return manualText ? `${baseText}\n\n【手动补充岗位信息】\n${manualText}`.trim() : baseText;
+}
+function stripManualJobBlock(text) {
+  return String(text || '').replace(/\n*【手动补充岗位信息】[\s\S]*$/u, '').trim();
+}
+function confirmJobDraft() {
+  const jdText = jdInput.value.trim();
+  if (jdText.length < 40) {
+    setStatus('请先补充更完整的岗位 JD 文本，再确认。', 'error');
+    saveJobDraft({ jdText, jdConfirmed: false });
+    return;
+  }
+  saveJobDraft({ jdText, jdConfirmed: true });
+  trackEvent('jd_text_confirmed', {
+    metadata: {
+      jdLengthBucket: textLengthBucket(jdText),
+      hasManualInfo: hasManualJobInfo()
+    }
+  });
+  setStatus('JD 文本已确认。开始分析前仍会结合已保存的简历档案。', 'success');
+}
+async function handleJobScreenshotUpload(event) {
+  const files = [...(event.target.files || [])];
+  if (!files.length) return;
+  const draft = getJobDraft();
+  const current = draft.screenshotFiles || [];
+  const accepted = [];
+  const errors = [];
+  for (const file of files) {
+    if (current.length + accepted.length >= 5) {
+      errors.push('最多只能上传 5 张岗位截图。');
+      break;
+    }
+    try {
+      const meta = await validateJobScreenshot(file);
+      accepted.push(meta);
+    } catch (err) {
+      errors.push(`${file.name}：${err.message}`);
+    }
+  }
+  const nextFiles = current.concat(accepted).slice(0, 5);
+  trackEvent('upload_jd_screenshot', {
+    success: errors.length === 0,
+    metadata: {
+      fileCount: files.length,
+      acceptedCount: accepted.length,
+      rejectedCount: errors.length,
+      exceededLimit: current.length + files.length > 5,
+      fileTypes: [...new Set(files.map(file => file.type || 'unknown'))],
+      sizeBuckets: [...new Set(files.map(file => fileSizeBucket(file.size)))]
+    }
+  });
+  saveJobDraft({
+    sourceType: 'screenshot',
+    jdConfirmed: false,
+    screenshotFiles: nextFiles
+  });
+  jobScreenshotInput.value = '';
+  if (errors.length) {
+    screenshotStatus.textContent = errors.join(' ');
+    screenshotStatus.className = 'status error';
+  } else {
+    screenshotStatus.textContent = '截图已上传并记录文件信息。当前版本暂不自动识别截图文字，请复制岗位 JD 文本粘贴到上方确认区。后续可接入 OCR / 多模态识别。';
+    screenshotStatus.className = 'status success';
+  }
+}
+function validateJobScreenshot(file) {
+  return new Promise((resolve, reject) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedExt = /\.(jpe?g|png|webp)$/i;
+    if (!allowedTypes.includes(file.type) || !allowedExt.test(file.name)) {
+      reject(new Error('仅支持 jpg / jpeg / png / webp，不支持 PDF、Word 或其他文件。'));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      reject(new Error('单张图片不能超过 5MB。'));
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      URL.revokeObjectURL(url);
+      if (height > 2500) {
+        reject(new Error('单张图片高度不能超过 2500px，请拆分为普通截图。'));
+        return;
+      }
+      resolve({
+        name: file.name,
+        size: file.size,
+        width,
+        height,
+        type: file.type,
+        uploadedAt: new Date().toLocaleString()
+      });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('图片读取失败，请换一张清晰截图。'));
+    };
+    img.src = url;
+  });
+}
+function renderScreenshotList(files) {
+  if (!files.length) {
+    screenshotList.innerHTML = '<div class="empty">暂无岗位截图。上传截图后这里只显示文件名、大小和尺寸，不保存图片内容。</div>';
+    return;
+  }
+  screenshotList.innerHTML = files.map((file, index) => `
+    <div class="screenshot-item">
+      <div>
+        <strong>${escapeHtml(file.name)}</strong><br>
+        ${formatFileSize(file.size)} · ${escapeHtml(file.width)} × ${escapeHtml(file.height)}px · ${escapeHtml(file.uploadedAt || '')}
+      </div>
+      <button class="mini-btn" type="button" onclick="removeJobScreenshot(${index})">删除</button>
+    </div>
+  `).join('');
+}
+function removeJobScreenshot(index) {
+  const draft = getJobDraft();
+  const files = (draft.screenshotFiles || []).filter((_, i) => i !== index);
+  saveJobDraft({ screenshotFiles: files, jdConfirmed: false, sourceType: files.length ? 'screenshot' : draft.sourceType });
+}
+function clearJobScreenshots() {
+  saveJobDraft({ screenshotFiles: [], jdConfirmed: false });
+  screenshotStatus.textContent = '已清空截图元信息。当前版本暂不自动识别截图文字，请复制岗位 JD 文本粘贴到上方确认区。';
+  screenshotStatus.className = 'status';
+}
+function formatFileSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)}MB`;
+  return `${Math.max(1, Math.round(n / 1024))}KB`;
+}
+function getResumeProfile() {
+  try { return JSON.parse(localStorage.getItem(STORAGE.resumeProfile) || 'null'); }
+  catch { return null; }
+}
+function renderResumeProfile() {
+  const profile = getResumeProfile();
+  if (!profile) {
+    profileView.innerHTML = `
+      <div class="profile-empty">
+        请先上传或粘贴一份简历，系统将生成本地简历档案。后续分析岗位时无需重复上传。
+      </div>
+      <div class="profile-safe">简历档案默认仅保存在当前浏览器本地，可随时删除。</div>
+    `;
+    analyzeHint.textContent = '请先创建简历档案，再确认岗位 JD 文本。简历文件可在本地解析，岗位截图当前不做 OCR。';
+    analyzeBtn.disabled = false;
+    showProfileEditor();
+    return;
+  }
+  profileEditor.classList.remove('visible');
+  profileView.innerHTML = `
+    <div class="profile-summary">
+      <div class="profile-item"><strong>当前简历摘要</strong><p>${escapeHtml(profile.experienceSummary || buildResumePreview(profile.resumeText))}</p></div>
+      <div class="profile-item"><strong>求职方向</strong><p>${escapeHtml(profile.targetRole || '暂未识别，可在简历中补充求职方向。')}</p></div>
+      <div class="profile-item"><strong>技能关键词</strong><p>${escapeHtml((profile.skillKeywords || []).join('、') || '暂未识别明显技能关键词。')}</p></div>
+      <div class="profile-item"><strong>教育背景摘要</strong><p>${escapeHtml(profile.educationSummary || '暂未识别教育背景。')}</p></div>
+      <div class="profile-item wide"><strong>项目经历摘要</strong><p>${escapeHtml(profile.projectSummary || '暂未识别项目经历。')}</p></div>
+      <div class="profile-item wide"><strong>上次更新时间</strong><p>${escapeHtml(profile.updatedAt || profile.createdAt || '未知')}</p></div>
+    </div>
+    <div class="ops">
+      <button class="primary-btn" type="button" onclick="continueWithProfile()">继续分析新岗位</button>
+      <button class="secondary-btn" type="button" onclick="showProfileEditor(true)">重新上传简历</button>
+      <button class="plain-btn" type="button" onclick="deleteResumeProfile()">删除当前简历</button>
+    </div>
+    <div class="profile-safe">当前将使用已保存的简历档案进行岗位分析，无需重复上传简历。简历档案默认仅保存在当前浏览器本地，可随时删除。</div>
+  `;
+  resumeInput.value = profile.resumeText || '';
+  updateCounts();
+  analyzeHint.textContent = '当前将使用已保存的简历档案进行岗位分析，无需重复上传简历。请确认岗位 JD 文本后开始分析。';
+}
+function showProfileEditor(keepCurrent = false) {
+  const profile = getResumeProfile();
+  if (keepCurrent && profile) resumeInput.value = profile.resumeText || '';
+  profileEditor.classList.add('visible');
+  updateCounts();
+  resumeInput.focus();
+}
+function hideProfileEditor() {
+  const profile = getResumeProfile();
+  if (!profile) {
+    resumeInput.value = '';
+    updateCounts();
+    return;
+  }
+  resumeInput.value = profile.resumeText || '';
+  profileEditor.classList.remove('visible');
+  updateCounts();
+}
+function continueWithProfile() {
+  trackStartAnalysisArea();
+  jdInput.focus();
+  $('analyzer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setStatus('当前将使用已保存的简历档案进行岗位分析，无需重复上传简历。请粘贴并确认岗位 JD。', 'success');
+}
+function saveResumeProfile() {
+  const text = resumeInput.value.trim();
+  if (text.length < 40) {
+    setStatus('请粘贴更完整的简历内容，至少包含教育背景、项目或技能。', 'error');
+    return;
+  }
+  const existing = getResumeProfile();
+  const now = new Date().toLocaleString();
+  const profile = {
+    id: existing?.id || String(Date.now()),
+    resumeText: text,
+    targetRole: extractTargetRole(text),
+    educationSummary: extractEducationSummary(text),
+    skillKeywords: extractSkillKeywords(text),
+    projectSummary: extractProjectSummary(text),
+    experienceSummary: extractExperienceSummary(text),
+    portfolioLinks: extractPortfolioLinks(text),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  };
+  localStorage.setItem(STORAGE.resumeProfile, JSON.stringify(profile));
+  renderResumeProfile();
+  renderLocalDataStatus();
+  trackEvent('resume_profile_created', {
+    metadata: {
+      isUpdate: Boolean(existing),
+      resumeLengthBucket: textLengthBucket(text)
+    }
+  });
+  setStatus(existing ? '简历档案已更新，后续岗位分析将使用新档案。' : '简历档案已创建，后续分析岗位时无需重复上传。', 'success');
+}
+function deleteResumeProfile() {
+  const ok = confirmAction('删除后，本地简历档案将被清空，后续分析需要重新上传简历。');
+  if (!ok) return;
+  localStorage.removeItem(STORAGE.resumeProfile);
+  resumeInput.value = '';
+  renderResumeProfile();
+  renderLocalDataStatus();
+  updateCounts();
+  trackEvent('resume_profile_deleted');
+  setStatus('本地简历档案已删除。请先创建简历档案，再分析岗位。', 'error');
+}
+function handleResumeFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  parseResumeFile(file);
+}
+async function parseResumeFile(file) {
+  const extension = getResumeFileExtension(file.name);
+  renderResumeFileMeta(file, extension);
+  setResumeFileStatus('', '');
+
+  const validationError = validateResumeFile(file, extension);
+  if (validationError) {
+    trackResumeUpload(file, extension, false, validationError.code);
+    setResumeFileStatus(validationError.message, 'error');
+    resumeFileInput.value = '';
+    return;
+  }
+
+  resumeFileInput.disabled = true;
+  setResumeFileStatus('正在解析简历……');
+  try {
+    let text = '';
+    if (extension === 'txt') text = await parseTxtResume(file);
+    if (extension === 'pdf') text = await parsePdfResume(file);
+    if (extension === 'docx') text = await parseDocxResume(file);
+
+    const cleanedText = cleanExtractedResumeText(text);
+    if (!cleanedText) {
+      throw createResumeImportError(
+        extension === 'pdf' ? 'PDF_NO_TEXT' : 'EMPTY_TEXT',
+        extension === 'pdf'
+          ? '该 PDF 可能是扫描版或图片版，暂时无法自动识别，请直接粘贴简历文字。'
+          : '未从文件中提取到简历文字，请确认文件内容后重试，或直接粘贴简历正文。'
+      );
+    }
+
+    resumeInput.value = cleanedText;
+    updateCounts();
+    trackResumeUpload(file, extension, true);
+    setResumeFileStatus('简历内容已提取，请检查后继续分析。', 'success');
+  } catch (error) {
+    const normalizedError = normalizeResumeImportError(error, extension);
+    trackResumeUpload(file, extension, false, normalizedError.code);
+    setResumeFileStatus(normalizedError.message, 'error');
+  } finally {
+    resumeFileInput.disabled = false;
+    resumeFileInput.value = '';
+  }
+}
+function getResumeFileExtension(fileName) {
+  const match = String(fileName || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+  return match ? match[1] : '';
+}
+function validateResumeFile(file, extension) {
+  if (!['txt', 'pdf', 'docx'].includes(extension)) {
+    return createResumeImportError('UNSUPPORTED_TYPE', '不支持该文件格式，请选择 TXT、PDF 或 DOCX 简历文件。');
+  }
+  if (file.size > RESUME_IMPORT_CONFIG.MAX_FILE_BYTES) {
+    return createResumeImportError('FILE_TOO_LARGE', '文件超过 10MB，请选择更小的简历文件。');
+  }
+  if (file.size === 0) {
+    return createResumeImportError('EMPTY_FILE', '文件内容为空，请重新选择文件或直接粘贴简历正文。');
+  }
+  return null;
+}
+function trackResumeUpload(file, extension, success, reason = '') {
+  trackEvent('upload_resume', {
+    success,
+    metadata: {
+      fileType: extension || file.type || 'unknown',
+      sizeBucket: fileSizeBucket(file.size),
+      ...(reason ? { reason } : {})
+    }
+  });
+}
+function renderResumeFileMeta(file, extension) {
+  const typeLabel = extension ? extension.toUpperCase() : (file.type || '未知格式');
+  resumeFileMeta.textContent = `文件：${file.name} · 类型：${typeLabel} · 大小：${formatFileSize(file.size)}`;
+  resumeFileMeta.className = 'resume-file-meta visible';
+}
+function setResumeFileStatus(text, type = '') {
+  resumeFileStatus.textContent = text;
+  resumeFileStatus.className = `resume-file-status ${text ? 'visible' : ''} ${type}`.trim();
+}
+function renderResumeLengthWarning() {
+  const length = resumeInput.value.length;
+  if (length > RESUME_IMPORT_CONFIG.PLATFORM_RESUME_CHAR_LIMIT) {
+    resumeLengthWarning.textContent = `当前简历正文共 ${length} 字，已完整展示。平台 AI 单次最多处理 ${RESUME_IMPORT_CONFIG.PLATFORM_RESUME_CHAR_LIMIT} 字，请检查后精简再分析；系统不会自动截断。`;
+    resumeLengthWarning.className = 'resume-length-warning visible';
+    return;
+  }
+  resumeLengthWarning.textContent = '';
+  resumeLengthWarning.className = 'resume-length-warning';
+}
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+function readFileWithReader(file, mode) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error('FILE_READ_FAILED'));
+    if (mode === 'text') reader.readAsText(file, 'utf-8');
+    else reader.readAsArrayBuffer(file);
+  });
+}
+async function parseTxtResume(file) {
+  try {
+    return String(await readFileWithReader(file, 'text') || '');
+  } catch {
+    throw createResumeImportError('TXT_READ_FAILED', 'TXT 文件读取失败，请确认文件未损坏，或直接粘贴简历正文。');
+  }
+}
+async function parsePdfResume(file) {
+  await loadResumeLibrary('pdfjs', RESUME_IMPORT_CONFIG.PDFJS_URL, () => Boolean(window.pdfjsLib));
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = RESUME_IMPORT_CONFIG.PDFJS_WORKER_URL;
+
+  let loadingTask;
+  let passwordRequired = false;
+  let pdfDocument;
+  try {
+    const data = new Uint8Array(await readFileWithReader(file, 'arrayBuffer'));
+    loadingTask = window.pdfjsLib.getDocument({ data });
+    loadingTask.onPassword = () => {
+      passwordRequired = true;
+      loadingTask.destroy();
+    };
+    pdfDocument = await loadingTask.promise;
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(item => {
+        const value = String(item.str || '');
+        return `${value}${item.hasEOL ? '\n' : ' '}`;
+      }).join('');
+      pages.push(cleanExtractedResumeText(pageText));
+      page.cleanup();
+    }
+    const text = pages.filter(Boolean).join('\n\n');
+    if (!text) {
+      throw createResumeImportError('PDF_NO_TEXT', '该 PDF 可能是扫描版或图片版，暂时无法自动识别，请直接粘贴简历文字。');
+    }
+    return text;
+  } catch (error) {
+    if (error?.code === 'PDF_NO_TEXT') throw error;
+    if (passwordRequired || error?.name === 'PasswordException') {
+      throw createResumeImportError('PDF_ENCRYPTED', '该 PDF 已加密，暂时无法解析，请解除密码后重试或直接粘贴简历文字。');
+    }
+    throw createResumeImportError('PDF_PARSE_FAILED', 'PDF 解析失败，文件可能已损坏或格式不兼容，请重新导出后重试，或直接粘贴简历文字。');
+  } finally {
+    if (pdfDocument) await pdfDocument.destroy().catch(() => {});
+  }
+}
+async function parseDocxResume(file) {
+  await loadResumeLibrary('mammoth', RESUME_IMPORT_CONFIG.MAMMOTH_URL, () => Boolean(window.mammoth));
+  try {
+    const arrayBuffer = await readFileWithReader(file, 'arrayBuffer');
+    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    const text = String(result?.value || '');
+    if (!text.trim()) {
+      throw createResumeImportError('EMPTY_TEXT', '未从 DOCX 中提取到文字，请确认文档包含正文，或直接粘贴简历正文。');
+    }
+    return text;
+  } catch (error) {
+    if (error?.code === 'EMPTY_TEXT') throw error;
+    throw createResumeImportError('DOCX_PARSE_FAILED', 'DOCX 解析失败，文件可能已损坏或格式不兼容，请重新导出后重试，或直接粘贴简历正文。');
+  }
+}
+function loadResumeLibrary(key, url, isReady) {
+  if (isReady()) return Promise.resolve();
+  if (resumeLibraryLoads[key]) return resumeLibraryLoads[key];
+  resumeLibraryLoads[key] = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    script.dataset.resumeLibrary = key;
+    script.onload = () => isReady()
+      ? resolve()
+      : reject(createResumeImportError('COMPONENT_LOAD_FAILED'));
+    script.onerror = () => reject(createResumeImportError('COMPONENT_LOAD_FAILED'));
+    document.head.appendChild(script);
+  }).catch(error => {
+    delete resumeLibraryLoads[key];
+    document.querySelector(`script[data-resume-library="${key}"]`)?.remove();
+    throw error;
+  });
+  return resumeLibraryLoads[key];
+}
+function cleanExtractedResumeText(text) {
+  return String(text || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[\u200B\uFEFF]/g, '')
+    .split('\n')
+    .map(line => line.replace(/\u00A0/g, ' ').replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+function createResumeImportError(code, message = '') {
+  const error = new Error(message || code);
+  error.code = code;
+  return error;
+}
+function normalizeResumeImportError(error, extension) {
+  if (error?.code === 'COMPONENT_LOAD_FAILED') {
+    return createResumeImportError('COMPONENT_LOAD_FAILED', '简历解析组件加载失败，请检查网络后重试，或直接粘贴简历正文。');
+  }
+  if (error?.code && error?.message) return error;
+  if (extension === 'docx') {
+    return createResumeImportError('DOCX_PARSE_FAILED', 'DOCX 解析失败，文件可能已损坏或格式不兼容，请重新导出后重试，或直接粘贴简历正文。');
+  }
+  if (extension === 'pdf') {
+    return createResumeImportError('PDF_PARSE_FAILED', 'PDF 解析失败，文件可能已损坏或格式不兼容，请重新导出后重试，或直接粘贴简历文字。');
+  }
+  return createResumeImportError('FILE_READ_FAILED', '简历文件读取失败，请重新选择文件或直接粘贴简历正文。');
+}
+function buildResumePreview(text) {
+  return cleanLine(text).slice(0, 90) || '已保存本地简历档案。';
+}
+function cleanLine(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+function extractTargetRole(text) {
+  const lines = String(text || '').split(/\n+/).map(v => v.trim()).filter(Boolean);
+  const hit = lines.find(line => /求职方向|目标岗位|应聘岗位|意向岗位|职业方向/.test(line));
+  if (hit) return hit.replace(/求职方向|目标岗位|应聘岗位|意向岗位|职业方向|[:：]/g, '').trim().slice(0, 60);
+  const keyword = ['AI 产品经理', '产品助理', '产品运营', '数据分析', 'AIGC 运营', 'ToB SaaS', '智能硬件'].find(v => text.includes(v));
+  return keyword || '';
+}
+function extractEducationSummary(text) {
+  const lines = String(text || '').split(/\n+/).map(v => v.trim()).filter(Boolean);
+  const hits = lines.filter(line => /教育|大学|学院|本科|硕士|研究生|专业|课程/.test(line));
+  return cleanLine(hits.slice(0, 2).join('；')).slice(0, 120);
+}
+function extractSkillKeywords(text) {
+  const skills = ['Python', 'SQL', 'Excel', 'Tableau', 'Power BI', 'Figma', 'Axure', 'PRD', 'Prompt', 'DeepSeek', 'ChatGPT', 'LLM', 'Agent', 'AIGC', '数据分析', '用户研究', '竞品分析', '原型设计', '需求分析', '产品运营', '增长', '埋点', '可视化', 'GitHub Pages'];
+  return skills.filter(skill => new RegExp(skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(text)).slice(0, 12);
+}
+function extractProjectSummary(text) {
+  const lines = String(text || '').split(/\n+/).map(v => v.trim()).filter(Boolean);
+  const hits = lines.filter(line => /项目|作品|上线|MVP|Demo|系统|平台|工具|Agent|小程序/.test(line));
+  return cleanLine(hits.slice(0, 3).join('；')).slice(0, 180);
+}
+function extractExperienceSummary(text) {
+  const lines = String(text || '').split(/\n+/).map(v => v.trim()).filter(Boolean);
+  const hits = lines.filter(line => /实习|工作|负责|主导|参与|运营|分析|用户|需求|产品/.test(line));
+  return cleanLine(hits.slice(0, 3).join('；')).slice(0, 180) || buildResumePreview(text);
+}
+function extractPortfolioLinks(text) {
+  return [...String(text || '').matchAll(/https?:\/\/[^\s，。；,;]+/g)].map(match => match[0]).slice(0, 8);
+}
 function saveApiKey() {
   const key = apiKeyInput.value.trim();
   if (!key) {
-    localStorage.removeItem(STORAGE.apiKey);
-    setStatus('已清空当前浏览器中的 DeepSeek API Key。留空时会使用 Mock 分析结果兜底。');
+    setStatus('请先填写 API Key，再点击保存。', 'error');
     return;
   }
   localStorage.setItem(STORAGE.apiKey, key);
-  setStatus('DeepSeek API Key 已保存到当前浏览器本地，不会写入代码仓库。', 'success');
+  localStorage.removeItem(STORAGE.legacyApiKey);
+  apiKeyInput.value = '';
+  renderApiKeyState();
+  renderAiModeState();
+  renderLocalDataStatus();
+  trackEvent('api_key_saved', {
+    metadata: { aiMode: getAiMode(), hasApiKey: true, source: 'settings' }
+  });
+  setStatus('API Key 已保存到当前浏览器本地，不会上传服务器、写入 URL 或代码仓库。', 'success');
+}
+function clearApiKey() {
+  const ok = confirmAction('确认清除当前浏览器中保存的自带 API Key 吗？');
+  if (!ok) return;
+  localStorage.removeItem(STORAGE.apiKey);
+  localStorage.removeItem(STORAGE.legacyApiKey);
+  apiKeyInput.value = '';
+  renderApiKeyState();
+  renderAiModeState();
+  renderLocalDataStatus();
+  trackEvent('api_key_cleared', {
+    metadata: { aiMode: getAiMode(), hasApiKey: false, source: 'settings' }
+  });
+  setStatus('已清除当前浏览器中的自带 API Key。', 'success');
 }
 function fillExample() {
   const example = exampleCases[Math.floor(Math.random() * exampleCases.length)];
   resumeInput.value = example.resume;
   jdInput.value = example.jd;
+  saveResumeProfile();
+  saveJobDraft({ jdText: example.jd, jdConfirmed: false, sourceType: 'paste' });
   updateCounts();
-  setStatus(`已填入「${example.title}」示例。你可以直接分析，也可以先替换成自己的内容。`, 'success');
+  setStatus(`已填入「${example.title}」示例，并生成本地简历档案。请先确认 JD 文本，再开始分析。`, 'success');
   scrollToAnalyzer();
 }
 function clearInputs() {
-  resumeInput.value = '';
   jdInput.value = '';
+  JOB_MANUAL_FIELDS.forEach(([, id]) => {
+    const el = $(id);
+    if (el) el.value = '';
+  });
+  saveJobDraft({
+    jdText: '',
+    jdConfirmed: false,
+    sourceType: 'paste',
+    companyName: '',
+    jobTitle: '',
+    city: '',
+    salaryRange: '',
+    educationRequirement: '',
+    experienceRequirement: '',
+    travelRequirement: '',
+    workSchedule: '',
+    extraNotes: '',
+    screenshotFiles: []
+  });
+  screenshotStatus.textContent = '当前版本暂不自动识别截图文字，请复制岗位 JD 文本粘贴到上方确认区。后续可接入 OCR / 多模态识别。';
+  screenshotStatus.className = 'status';
   updateCounts();
   resultPanel.classList.remove('visible');
-  setStatus('已清空输入。请重新粘贴简历文本和岗位 JD。');
+  setStatus('已清空岗位 JD 草稿，简历档案仍保存在当前浏览器本地。');
+}
+function clearResumeProfileData() {
+  const ok = confirmAction('确认清空当前浏览器中的简历档案吗？后续分析需要重新上传或粘贴简历。');
+  if (!ok) return;
+  localStorage.removeItem(STORAGE.resumeProfile);
+  resumeInput.value = '';
+  renderResumeProfile();
+  renderLocalDataStatus();
+  updateCounts();
+  trackEvent('resume_profile_deleted');
+  setStatus('简历档案已清空。', 'success');
+}
+function clearJobDraftData() {
+  const ok = confirmAction('确认清空当前浏览器中的岗位草稿吗？这会删除 JD 文本、手动补充信息和截图元信息。');
+  if (!ok) return;
+  localStorage.removeItem(STORAGE.jobDraft);
+  jdInput.value = '';
+  JOB_MANUAL_FIELDS.forEach(([, id]) => {
+    const el = $(id);
+    if (el) el.value = '';
+  });
+  hydrateJobDraft();
+  screenshotStatus.textContent = '当前版本暂不自动识别截图文字，请复制岗位 JD 文本粘贴到上方确认区。后续可接入 OCR / 多模态识别。';
+  screenshotStatus.className = 'status';
+  resultPanel.classList.remove('visible');
+  renderLocalDataStatus();
+  updateCounts();
+  setStatus('岗位草稿已清空。', 'success');
+}
+function clearAllLocalData() {
+  const ok = confirmAction('确认清空全部本地数据吗？这将删除当前浏览器中的简历档案、岗位草稿、求职记录和自带 API Key。此操作不可恢复。');
+  if (!ok) return;
+  trackEvent('clear_all_local_data', {
+    metadata: {
+      hasResumeProfile: Boolean(getResumeProfile()),
+      hasJobDraft: Boolean(localStorage.getItem(STORAGE.jobDraft)),
+      jobRecordCount: getJobRecords().length,
+      hasApiKey: Boolean(getUserApiKey())
+    }
+  });
+  getProjectStorageKeys().forEach(key => localStorage.removeItem(key));
+  resumeInput.value = '';
+  jdInput.value = '';
+  apiKeyInput.value = '';
+  JOB_MANUAL_FIELDS.forEach(([, id]) => {
+    const el = $(id);
+    if (el) el.value = '';
+  });
+  currentResult = null;
+  currentRecordId = null;
+  resultPanel.classList.remove('visible');
+  hydrateJobDraft();
+  renderResumeProfile();
+  renderHistory();
+  renderJobRecords();
+  renderApiKeyState();
+  renderAiModeState();
+  renderLocalDataStatus();
+  renderAnalyticsDashboard();
+  updateCounts();
+  setStatus('已清空全部简岗配 AI 本地数据。', 'success');
+}
+function getProjectStorageKeys() {
+  return [
+    STORAGE.resumeProfile,
+    STORAGE.jobDraft,
+    STORAGE.jobRecords,
+    STORAGE.apiKey,
+    STORAGE.legacyApiKey,
+    STORAGE.history,
+    STORAGE.feedback,
+    STORAGE.anonymousUserId,
+    STORAGE.analyticsQueue,
+    STORAGE.feedbackRecords,
+    STORAGE.aiMode
+  ];
 }
 function setStep(index) {
   progressBox.classList.add('active');
@@ -855,26 +2843,97 @@ function finishSteps() {
   for (let i = 0; i < 4; i++) $(`step${i}`).className = 'step done';
 }
 function validateInput() {
-  if (resumeInput.value.trim().length < 40) return '请粘贴更完整的简历内容，至少包含教育背景、项目或技能。';
-  if (jdInput.value.trim().length < 40) return '请粘贴更完整的岗位 JD，至少包含职责和任职要求。';
+  const profile = getResumeProfile();
+  const draft = getJobDraft();
+  if (!profile || !profile.resumeText || profile.resumeText.trim().length < 40) return '请先创建简历档案，再分析岗位。';
+  if (draft.jdText.trim().length < 40) return '请粘贴更完整的岗位 JD，至少包含职责和任职要求。';
+  if (!draft.jdConfirmed) return '请先确认岗位 JD 文本，避免截图或复制内容识别错误导致分析不准确。';
+  return '';
+}
+function validateAiModeForAnalysis() {
+  const mode = getAiMode();
+  if (mode === 'own_api' && !getUserApiKey()) return '请先保存自带 API Key，或切换到本地演示模式。';
+  if (mode === 'platform_api') {
+    if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
+      return '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。请切换到本地演示模式。';
+    }
+    const resumeLength = getResumeProfile()?.resumeText?.length || 0;
+    if (resumeLength > RESUME_IMPORT_CONFIG.PLATFORM_RESUME_CHAR_LIMIT) {
+      return `当前简历正文共 ${resumeLength} 字，平台 AI 单次最多处理 ${RESUME_IMPORT_CONFIG.PLATFORM_RESUME_CHAR_LIMIT} 字。请先精简简历档案后再分析，系统不会自动截断。`;
+    }
+  }
+  if (mode === 'platform_api' && !currentAuthSession) {
+    trackEvent('platform_api_requires_login', { metadata: quotaEventMetadata('analysis_click') });
+    return '平台 AI 模式需要登录后使用。登录后可免费体验 3 次。当前可先使用本地演示模式或自带 API Key 模式。';
+  }
+  if (mode === 'platform_api') {
+    if (!platformWorkerConfigured()) return '平台 AI 后端尚未配置。当前不会调用 DeepSeek，可先使用本地演示模式生成 Mock 分析。';
+    trackEvent('platform_api_quota_viewed', { metadata: quotaEventMetadata('analysis_click') });
+  }
   return '';
 }
 async function runAnalyze() {
+  trackStartAnalysisArea();
+  const startedAt = performance.now();
   const error = validateInput();
+  const modeError = error ? '' : validateAiModeForAnalysis();
+  trackEvent('run_match_analysis', {
+    success: !error && !modeError,
+    metadata: {
+      aiMode: getAiMode(),
+      hasApiKey: Boolean(getUserApiKey()),
+      hasResumeProfile: Boolean(getResumeProfile()),
+      hasConfirmedJD: Boolean(getJobDraft().jdConfirmed),
+      jdLengthBucket: textLengthBucket(getJobDraft().jdText)
+    }
+  });
   if (error) {
     setStatus(error, 'error');
     return;
   }
+  if (modeError) {
+    setStatus(modeError, 'error');
+    return;
+  }
   analyzeBtn.disabled = true;
   resultPanel.classList.remove('visible');
-  setStatus('分析中：DeepSeek 文本 Agent 正在提取岗位要求并匹配简历信息。');
+  const profile = getResumeProfile();
+  const resumeText = profile.resumeText.trim();
+  const jdText = getConfirmedJobText();
+  const mode = getAiMode();
+  if (mode === 'platform_api') {
+    try {
+      await runPlatformAnalyze(profile, getJobDraft(), startedAt);
+    } catch (err) {
+      trackEvent('platform_api_failed', {
+        success: false,
+        durationMs: performance.now() - startedAt,
+        metadata: {
+          aiMode: 'platform_api',
+          errorCode: 'NETWORK_OR_WORKER_ERROR',
+          hasResumeProfile: true,
+          hasConfirmedJD: getJobDraft().jdConfirmed === true
+        }
+      });
+      setStatus(`平台 AI 调用失败：${err.message || '请稍后重试，或切换到本地演示模式。'}`, 'error');
+    } finally {
+      analyzeBtn.disabled = false;
+    }
+    return;
+  }
+  const analysisReason = mode === 'own_api'
+    ? '自带 API Key 模式暂未开放真实调用，本地演示规则分析'
+    : '本地演示模式规则分析';
+  setStatus(mode === 'own_api'
+    ? '当前版本尚未启用真实自带 Key 调用，本次使用本地规则生成演示分析。'
+    : '分析中：正在基于本地规则生成完整求职分析包。');
   try {
     setStep(0);
     await wait(450);
     setStep(1);
     await wait(450);
     setStep(2);
-    const result = await analyzeWithFallback(resumeInput.value.trim(), jdInput.value.trim());
+    const result = createMockResult(resumeText, jdText, analysisReason);
     setStep(3);
     await wait(350);
     finishSteps();
@@ -882,181 +2941,521 @@ async function runAnalyze() {
     currentRecordId = saveHistory(currentResult);
     renderResult(currentResult);
     renderHistory();
-    setStatus(
-      currentResult.meta.mock
-        ? `已启用本地兜底分析：${currentResult.meta.reason || 'DeepSeek 调用失败或未配置服务端代理'}。`
-        : `分析完成，已通过${currentResult.meta.source === 'worker' ? '服务端代理' : '浏览器直连 DeepSeek'}生成结果，并保存到历史记录。`,
-      currentResult.meta.mock ? '' : 'success'
-    );
+    trackEvent('generate_job_package', {
+      durationMs: performance.now() - startedAt,
+      metadata: {
+        aiMode: mode,
+        matchScoreRange: matchScoreRange(currentResult.matchScore),
+        applyRecommendation: currentResult.applyRecommendation,
+        hasResumeProfile: true,
+        hasConfirmedJD: true
+      }
+    });
+    setStatus(mode === 'own_api'
+      ? '完整求职分析包已生成。当前版本尚未启用真实自带 Key 调用，本次使用本地规则生成演示分析。'
+      : '完整求职分析包已生成。本阶段使用本地规则 / Mock 分析，结果仅供求职准备参考。', 'success');
   } catch (err) {
-    const fallback = createMockResult(resumeInput.value.trim(), jdInput.value.trim(), 'API 异常后 Mock 兜底');
+    const fallback = createMockResult(resumeText, jdText, 'API 异常后 Mock 兜底');
     currentResult = fallback;
     currentRecordId = saveHistory(fallback);
     renderResult(fallback);
     renderHistory();
+    trackEvent('generate_job_package', {
+      success: false,
+      durationMs: performance.now() - startedAt,
+      metadata: {
+        aiMode: mode,
+        matchScoreRange: matchScoreRange(fallback.matchScore),
+        applyRecommendation: fallback.applyRecommendation,
+        hasResumeProfile: true,
+        hasConfirmedJD: true,
+        fallback: true
+      }
+    });
     setStatus(`分析失败，已启用 Mock 兜底：${err.message || '未知错误'}`, 'error');
   } finally {
     analyzeBtn.disabled = false;
   }
-}
-async function analyzeWithFallback(resumeText, jdText) {
-  const key = apiKeyInput.value.trim() || localStorage.getItem(STORAGE.apiKey) || '';
-  if (WORKER_API_URL) {
-    try {
-      return await callWorker(resumeText, jdText);
-    } catch (err) {
-      console.warn('Worker failed, fallback to local mode:', err);
-      if (!key) return createMockResult(resumeText, jdText, `Worker 调用失败：${err.message || '未知错误'}`);
-    }
-  }
-  if (!key) return createMockResult(resumeText, jdText, '未配置 DeepSeek API Key');
-  try {
-    return await callDeepSeekDirect(resumeText, jdText, key);
-  } catch (err) {
-    console.warn('DeepSeek failed, fallback to mock:', err);
-    return createMockResult(resumeText, jdText, `浏览器直连 DeepSeek 失败：${err.message || 'API 调用失败'}`);
-  }
-}
-async function callWorker(resumeText, jdText) {
-  const resp = await fetch(WORKER_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ resumeText, jdText })
-  });
-  const data = await readJsonResponse(resp);
-  if (!resp.ok) throw new Error(data.error || `Worker HTTP ${resp.status}`);
-  return { ...data, meta: { mock: false, source: 'worker' } };
-}
-async function callDeepSeekDirect(resumeText, jdText, key) {
-  const resp = await fetch(DEEPSEEK_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: '你是资深 HR 和 AI 产品经理教练，只能分析用户提供的文本，只返回严格 JSON。' },
-        { role: 'user', content: buildAnalyzePrompt(resumeText, jdText) }
-      ],
-      temperature: 0.25,
-      max_tokens: 2600
-    })
-  });
-  const data = await readJsonResponse(resp);
-  if (!resp.ok) throw new Error(data.error?.message || data.error || `DeepSeek HTTP ${resp.status}`);
-  const content = data.choices?.[0]?.message?.content || '';
-  return { ...JSON.parse(stripCodeFence(content)), meta: { mock: false, source: 'direct' } };
 }
 async function readJsonResponse(resp) {
   const text = await resp.text();
   try { return JSON.parse(text); }
   catch { return { error: text || '响应不是 JSON' }; }
 }
-function buildAnalyzePrompt(resumeText, jdText) {
-  return `你是一个基于 DeepSeek 文本模型的求职匹配分析 Agent。请只基于用户粘贴的简历文本和岗位 JD 文本进行分析，输出严格 JSON，不要 Markdown。
-
-JSON 字段：
-{
-  "jobTitle": "岗位名称",
-  "score": 0-100,
-  "summary": "一句话摘要",
-  "coreRequirements": ["岗位核心要求"],
-  "strengths": ["简历匹配优势"],
-  "weaknesses": ["简历明显短板"],
-  "missingKeywords": ["缺失关键词"],
-  "resumeSuggestions": ["简历修改建议"],
-  "interviewQuestions": ["面试可能被问的问题"],
-  "hrMessage": "给 HR 的打招呼话术",
-  "nextActions": ["下一步行动建议"]
+function getPlatformWorkerEndpoint() {
+  const baseUrl = (PLATFORM_AI_CONFIG.PLATFORM_WORKER_BASE_URL || '').trim().replace(/\/+$/, '');
+  const rawPath = (PLATFORM_AI_CONFIG.PLATFORM_ANALYZE_PATH || '').trim();
+  const apiPath = rawPath ? `/${rawPath.replace(/^\/+/, '')}` : '';
+  if (!baseUrl || !apiPath) return '';
+  return `${baseUrl}${apiPath}`;
 }
-
-要求：
-1. 不要假设你读取了图片、PDF、附件或网页内容。
-2. 如果简历或 JD 信息不足，请明确提示需要用户补充文本。
-3. 不要夸大结果；保留人工复核空间；建议具体可执行。
-
-【简历文本】
-${resumeText}
-
-【岗位 JD 文本】
-${jdText}`;
+function createPlatformRequestId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `platform_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
-function stripCodeFence(text) {
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  return (match ? match[1] : text).trim();
-}
-function normalizeResult(result) {
+function buildPlatformAnalyzePayload(requestId, profile, draft) {
   return {
-    jobTitle: result.jobTitle || '目标岗位',
-    score: clamp(Number(result.score) || 72, 0, 100),
-    summary: result.summary || '已生成结构化匹配分析，请结合个人情况人工复核。',
-    coreRequirements: arr(result.coreRequirements),
-    strengths: arr(result.strengths),
-    weaknesses: arr(result.weaknesses),
-    missingKeywords: arr(result.missingKeywords),
-    resumeSuggestions: arr(result.resumeSuggestions),
-    interviewQuestions: arr(result.interviewQuestions),
-    hrMessage: result.hrMessage || '您好，我对贵公司的岗位很感兴趣。我的项目经历与岗位要求有一定匹配，希望有机会进一步沟通。',
-    nextActions: arr(result.nextActions),
-    meta: result.meta || { mock: false }
+    requestId,
+    resumeProfile: {
+      targetRole: profile.targetRole || '',
+      educationSummary: profile.educationSummary || '',
+      skillKeywords: arr(profile.skillKeywords),
+      projectSummary: profile.projectSummary || '',
+      experienceSummary: profile.experienceSummary || '',
+      portfolioLinks: arr(profile.portfolioLinks),
+      resumeText: profile.resumeText || ''
+    },
+    jobDraft: {
+      jdText: draft.jdText || '',
+      jdConfirmed: draft.jdConfirmed === true,
+      companyName: draft.companyName || '',
+      jobTitle: draft.jobTitle || '',
+      city: draft.city || '',
+      salaryRange: draft.salaryRange || '',
+      educationRequirement: draft.educationRequirement || '',
+      experienceRequirement: draft.experienceRequirement || '',
+      travelRequirement: draft.travelRequirement || '',
+      workSchedule: draft.workSchedule || '',
+      extraNotes: draft.extraNotes || ''
+    },
+    anonymousUserId: getAnonymousUserId()
   };
 }
-function createMockResult(resumeText, jdText, reason) {
-  const jobTitle = extractJobTitle(jdText);
-  const profile = buildLocalAnalysisProfile(resumeText, jdText);
-  const score = scoreByKeywords(resumeText, jdText, profile);
-  return normalizeResult({
-    jobTitle,
-    score,
-    summary: `当前简历与「${jobTitle}」的匹配度为 ${score} 分。${profile.summary}`,
-    coreRequirements: profile.coreRequirements,
-    strengths: profile.strengths,
-    weaknesses: profile.weaknesses,
-    missingKeywords: profile.missingKeywords,
-    resumeSuggestions: profile.resumeSuggestions,
-    interviewQuestions: profile.interviewQuestions,
-    hrMessage: buildHrMessage(jobTitle, profile),
-    nextActions: profile.nextActions,
-    meta: { mock: true, reason }
+async function runPlatformAnalyze(profile, draft, startedAt) {
+  if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
+    throw new Error('平台 AI 正在进行安全与额度闭环测试，当前暂未开放。');
+  }
+  const endpoint = getPlatformWorkerEndpoint();
+  const token = currentAuthSession?.access_token;
+  if (!endpoint || !token) throw new Error('平台 AI 后端或登录状态不可用。');
+  const requestId = createPlatformRequestId();
+  trackEvent('platform_api_request', {
+    metadata: {
+      aiMode: 'platform_api',
+      hasResumeProfile: true,
+      hasConfirmedJD: draft.jdConfirmed === true
+    }
   });
+  setStatus('平台 AI 分析中：正在通过 Worker 校验登录、额度和限流，然后生成完整求职分析包。');
+  setStep(0);
+  const payload = buildPlatformAnalyzePayload(requestId, profile, draft);
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+  setStep(1);
+  const data = await readJsonResponse(resp);
+  if (!resp.ok || data.success === false) {
+    handlePlatformApiFailure(data, startedAt);
+    return;
+  }
+  setStep(2);
+  currentResult = normalizeResult({
+    ...data.report,
+    companyName: data.report?.companyName || draft.companyName,
+    jobTitle: data.report?.jobTitle || draft.jobTitle,
+    city: data.report?.city || draft.city,
+    salaryRange: data.report?.salaryRange || draft.salaryRange,
+    meta: {
+      mock: false,
+      source: 'platform_worker',
+      model: data.model || '',
+      quotaType: data.quotaType || ''
+    }
+  });
+  setStep(3);
+  finishSteps();
+  currentRecordId = saveHistory(currentResult);
+  renderResult(currentResult);
+  renderHistory();
+  if (data.quota) {
+    currentQuota = normalizeQuota(data.quota);
+    renderQuotaState();
+    renderPlatformAiAccessState();
+  }
+  trackEvent('platform_api_success', {
+    durationMs: performance.now() - startedAt,
+    metadata: {
+      aiMode: 'platform_api',
+      matchScoreRange: matchScoreRange(currentResult.matchScore),
+      applyRecommendation: currentResult.applyRecommendation,
+      quotaType: data.quotaType || '',
+      hasResumeProfile: true,
+      hasConfirmedJD: true
+    }
+  });
+  trackEvent('quota_used', {
+    durationMs: performance.now() - startedAt,
+    metadata: {
+      aiMode: 'platform_api',
+      quotaType: data.quotaType || '',
+      matchScoreRange: matchScoreRange(currentResult.matchScore)
+    }
+  });
+  setStatus('平台 AI 已生成完整求职分析包。额度由 Worker 在 DeepSeek 成功返回后扣减，前端只展示结果。', 'success');
 }
-function buildLocalAnalysisProfile(resumeText, jdText) {
+function handlePlatformApiFailure(data = {}, startedAt = performance.now()) {
+  const errorCode = String(data.errorCode || 'PLATFORM_API_FAILED').toUpperCase();
+  const message = platformApiErrorMessage(errorCode, data.message);
+  const metadata = {
+    aiMode: 'platform_api',
+    errorCode,
+    hasResumeProfile: Boolean(getResumeProfile()),
+    hasConfirmedJD: Boolean(getJobDraft().jdConfirmed)
+  };
+  trackEvent('platform_api_failed', {
+    success: false,
+    durationMs: performance.now() - startedAt,
+    metadata
+  });
+  if (errorCode === 'QUOTA_EXHAUSTED') trackEvent('quota_exhausted', { success: false, metadata });
+  if (errorCode === 'RATE_LIMITED') trackEvent('rate_limited', { success: false, metadata });
+  if (errorCode === 'TEXT_TOO_LONG') trackEvent('text_too_long', { success: false, metadata });
+  if (errorCode === 'DEEPSEEK_PARSE_FAILED') trackEvent('deepseek_parse_failed', { success: false, metadata });
+  if (['DUPLICATE_REQUEST', 'REQUEST_PROCESSING'].includes(errorCode)) trackEvent('duplicate_request', { success: false, metadata });
+  setStatus(message, 'error');
+}
+function platformApiErrorMessage(errorCode, fallback) {
+  const messages = {
+    AUTH_REQUIRED: '平台 AI 模式需要登录后使用。',
+    QUOTA_EXHAUSTED: '免费次数已用完，后续可 5 元购买 15 次完整求职分析额度。',
+    RATE_LIMITED: '请求过于频繁，请稍后再试。',
+    TEXT_TOO_LONG: '简历或岗位 JD 内容过长，请精简后再分析。',
+    DUPLICATE_REQUEST: '本次请求已处理过，系统不会重复扣费。',
+    REQUEST_PROCESSING: '同一请求正在处理中，请稍后查看结果。',
+    DEEPSEEK_PARSE_FAILED: 'AI 返回内容解析失败，本次不扣次数，请稍后重试。'
+  };
+  return messages[errorCode] || fallback || '平台 AI 调用失败，请稍后重试或切换到本地演示模式。';
+}
+function normalizeResult(result) {
+  const score = clamp(Number(result.matchScore ?? result.score) || 60, 0, 100);
+  const keywordAnalysis = result.keywordAnalysis || result.missingKeywords || {};
+  const jdBreakdown = result.jdBreakdown || result.jdAnalysis || {};
+  const rewritten = result.rewrittenResumeContent || {};
+  const messages = result.messages || {};
+  const rawInterviewPrep = result.interviewPrep || {};
+  const optimizationSuggestions = Array.isArray(result.optimizationSuggestions)
+    ? result.optimizationSuggestions
+    : buildOptimizationSuggestionsFromReport(result.resumeOptimization || {});
+  const resumeRewrite = result.resumeRewrite || {
+    summary: rewritten.tailoredSummary || result.summary || '',
+    projectExample: rewritten.projectRewrite || '',
+    skillsExample: rewritten.skillsRewrite || ''
+  };
+  const outreachScripts = result.outreachScripts || {
+    boss: messages.bossGreeting || result.hrMessage || '',
+    wechat: messages.wechatMessage || '',
+    emailSubject: messages.emailSubject || '',
+    emailBody: messages.emailBody || '',
+    attachmentReminder: messages.attachmentReminder || '附件建议包含 PDF 简历、作品集链接说明，文件名写清姓名和岗位方向。'
+  };
+  const interviewPrep = {
+    jdQuestions: arr(rawInterviewPrep.jdQuestions),
+    projectQuestions: arr(rawInterviewPrep.projectQuestions || rawInterviewPrep.projectDeepDiveQuestions),
+    weaknessQuestions: arr(rawInterviewPrep.weaknessQuestions || rawInterviewPrep.weaknessValidationQuestions),
+    aiProductQuestions: arr(rawInterviewPrep.aiProductQuestions),
+    hrQuestions: arr(rawInterviewPrep.hrQuestions)
+  };
+  return {
+    reportType: 'completeJobApplicationPackage',
+    companyName: result.companyName || '',
+    jobTitle: result.jobTitle || '目标岗位',
+    city: result.city || '',
+    salaryRange: result.salaryRange || '',
+    matchScore: score,
+    score,
+    matchLevel: result.matchLevel || getMatchLevel(score),
+    applyRecommendation: result.applyRecommendation || getApplyRecommendation(score, false),
+    summary: result.summary || result.finalReminder || '已生成完整求职分析包，请结合个人情况和 HR 沟通结果人工复核。',
+    jdBreakdown: {
+      coreResponsibilities: arr(jdBreakdown.coreResponsibilities),
+      hardRequirements: arr(jdBreakdown.hardRequirements),
+      bonusPoints: arr(jdBreakdown.bonusPoints),
+      hiddenRequirements: arr(jdBreakdown.hiddenRequirements),
+      risks: arr(jdBreakdown.risks || jdBreakdown.jobRisks),
+      interviewFocus: arr(jdBreakdown.interviewFocus)
+    },
+    resumeMatches: arr(result.resumeMatches || result.strengths),
+    resumeWeaknesses: arr(result.resumeWeaknesses || result.weaknesses),
+    keywordAnalysis: {
+      covered: arr(keywordAnalysis.covered),
+      missing: arr(keywordAnalysis.missing || result.missingKeywords),
+      suggested: arr(keywordAnalysis.suggested)
+    },
+    optimizationSuggestions,
+    resumeRewrite,
+    outreachScripts,
+    interviewPrep,
+    selfIntroduction: result.selfIntroduction || '',
+    reverseQuestions: arr(result.reverseQuestions),
+    nextActions: arr(result.nextActions),
+    coreRequirements: arr(jdBreakdown.coreResponsibilities),
+    strengths: arr(result.resumeMatches || result.strengths),
+    weaknesses: arr(result.resumeWeaknesses || result.weaknesses),
+    missingKeywords: arr(keywordAnalysis.missing || result.missingKeywords),
+    resumeSuggestions: optimizationSuggestions.map(item => item.recommendedExpression || item.direction || item.problem).filter(Boolean),
+    interviewQuestions: flattenInterviewPrep(interviewPrep),
+    hrMessage: outreachScripts.boss || '',
+    meta: result.meta || { mock: true }
+  };
+}
+function buildOptimizationSuggestionsFromReport(advice = {}) {
+  const rows = [
+    ['个人总结', advice.summaryAdvice],
+    ['技能描述', advice.skillsAdvice],
+    ['项目经历', advice.projectAdvice],
+    ['实习 / 工作经历', advice.experienceAdvice],
+    ['作品集 / 项目链接', advice.portfolioAdvice]
+  ];
+  return rows.map(([module, value]) => ({
+    module,
+    problem: value?.problem || value?.currentProblem || value || '',
+    direction: value?.direction || value?.modifyDirection || '',
+    recommendedExpression: value?.recommendedExpression || value?.example || value?.rewrite || ''
+  })).filter(item => item.problem || item.direction || item.recommendedExpression);
+}
+function createMockResult(resumeText, jdText, reason) {
+  return normalizeResult(buildCompleteApplicationPackage(resumeText, jdText, reason));
+}
+function buildCompleteApplicationPackage(resumeText, jdText, reason) {
+  const draft = getJobDraft();
+  const resumeProfile = getResumeProfile() || {};
   const resume = normalizeText(resumeText);
   const jd = normalizeText(jdText);
   const jdNeeds = KEYWORD_GROUPS.filter(group => hasAny(jd, group.words));
-  const matched = jdNeeds.filter(group => hasAny(resume, group.words));
-  const missing = jdNeeds.filter(group => !hasAny(resume, group.words));
-  const extraStrengths = KEYWORD_GROUPS.filter(group => !jdNeeds.includes(group) && hasAny(resume, group.words));
-  const coreRequirements = uniqueList([
-    ...jdNeeds.map(group => group.requirement),
-    '岗位信息拆解与结构化表达',
-    '结果复核与持续迭代意识'
-  ]).slice(0, 6);
-  const strengths = uniqueList([
-    ...matched.map(group => group.strength),
-    ...extraStrengths.slice(0, 2).map(group => group.extraStrength),
-    inferProjectStrength(resume),
-    inferEducationStrength(resume)
-  ]).filter(Boolean).slice(0, 5);
-  const weaknesses = uniqueList([
-    ...missing.map(group => group.weakness),
-    ...inferExperienceWeaknesses(resume, jd)
-  ]).filter(Boolean).slice(0, 5);
-  const missingKeywords = uniqueList(missing.flatMap(group => group.displayKeywords)).slice(0, 8);
-  const resumeSuggestions = uniqueList([
-    ...missing.map(group => group.suggestion),
-    '每个项目建议按“用户场景-痛点-方案-AI 角色-结果-下一步”重写，避免只罗列工具。',
-    '把最贴近 JD 的 2 个项目前置，并补充可验证结果，例如上线链接、用户反馈、分析记录或迭代版本。'
-  ]).slice(0, 5);
+  const matchedGroups = jdNeeds.filter(group => hasAny(resume, group.words));
+  const missingGroups = jdNeeds.filter(group => !hasAny(resume, group.words));
+  const allJdKeywords = extractKnownKeywords(jdText);
+  const coveredKeywords = allJdKeywords.filter(keyword => normalizeText(resumeText).includes(normalizeText(keyword)));
+  const missingKeywords = allJdKeywords.filter(keyword => !coveredKeywords.includes(keyword));
+  const hardRisks = detectHardRequirementRisks(jdText, resumeText);
+  const infoInsufficient = jdText.trim().length < 80 || allJdKeywords.length < 3;
+  const score = calculateApplicationScore(jdNeeds, matchedGroups, missingGroups, hardRisks, resumeText, jdText, infoInsufficient);
+  const matchLevel = getMatchLevel(score);
+  const applyRecommendation = infoInsufficient ? '信息不足，需要人工判断' : getApplyRecommendation(score, hardRisks.length > 1);
+  const companyName = draft.companyName || extractCompanyName(jdText);
+  const jobTitle = draft.jobTitle || extractJobTitle(jdText);
+  const city = draft.city || extractCity(jdText);
+  const salaryRange = draft.salaryRange || extractSalary(jdText);
+  const projectLink = (resumeProfile.portfolioLinks || [])[0] || extractPortfolioLinks(resumeText)[0] || '作品集 / 项目链接可在简历中补充';
+  const resumeMatches = buildResumeMatches(matchedGroups, resumeText);
+  const resumeWeaknesses = buildResumeWeaknesses(missingGroups, hardRisks, resumeText, jdText);
+  const jdBreakdown = buildJdBreakdown(jdNeeds, hardRisks, jdText);
+  const optimizationSuggestions = buildOptimizationSuggestions(missingGroups, hardRisks, coveredKeywords, missingKeywords, jobTitle);
+  const resumeRewrite = buildResumeRewrite(jobTitle, coveredKeywords, missingKeywords, projectLink);
+  const outreachScripts = buildOutreachScripts(companyName, jobTitle, resumeMatches, projectLink);
+  const interviewPrep = buildFullInterviewPrep(jdBreakdown, resumeWeaknesses, missingGroups);
+  const reverseQuestions = [
+    '这个岗位入职后前三个月最核心的职责和交付物是什么？',
+    '团队目前在 AI 产品落地中最大的难点是数据、模型效果、业务流程还是用户使用意愿？',
+    '这个岗位需要和哪些角色高频协作，需求优先级通常由谁来定？',
+    '试用期会重点考察哪些能力或结果？有没有明确的成功标准？',
+    '当前业务阶段最希望通过这个岗位推动哪个指标或目标？'
+  ];
+  const summary = infoInsufficient
+    ? `当前 JD 信息偏少，建议先补充职责、要求和业务场景后再做最终判断。`
+    : `当前简历与「${jobTitle}」为${matchLevel}，建议结论：${applyRecommendation}。以上建议仅供求职准备参考，最终判断仍需结合个人情况和 HR 沟通结果。`;
   return {
-    summary: buildSummary(matched, missing),
-    coreRequirements,
-    strengths: strengths.length ? strengths : ['简历已有项目或技能信息，可作为投递初稿；建议继续补充与 JD 直接相关的结果证据。'],
-    weaknesses: weaknesses.length ? weaknesses : ['当前 JD 中的核心要求覆盖较充分，建议进一步补充量化结果和真实用户反馈，提升可信度。'],
-    missingKeywords: missingKeywords.length ? missingKeywords : ['暂无明显缺失关键词，建议人工复核 JD 中的高频能力要求。'],
-    resumeSuggestions,
-    interviewQuestions: buildInterviewQuestions(jdNeeds, missing),
-    nextActions: buildNextActions(missing)
+    companyName,
+    jobTitle,
+    city,
+    salaryRange,
+    matchScore: score,
+    matchLevel,
+    applyRecommendation,
+    summary,
+    jdBreakdown,
+    resumeMatches,
+    resumeWeaknesses,
+    keywordAnalysis: {
+      covered: coveredKeywords.slice(0, 12),
+      missing: missingKeywords.slice(0, 12),
+      suggested: uniqueList([...missingKeywords.slice(0, 8), ...missingGroups.flatMap(group => group.displayKeywords)]).slice(0, 12)
+    },
+    optimizationSuggestions,
+    resumeRewrite,
+    outreachScripts,
+    interviewPrep,
+    selfIntroduction: buildSelfIntroduction(jobTitle, coveredKeywords, projectLink),
+    reverseQuestions,
+    nextActions: buildNextActions(missingGroups),
+    meta: { mock: true, reason }
   };
+}
+function extractKnownKeywords(text) {
+  const dictionary = [
+    'AI', 'AIGC', 'Agent', 'RAG', 'LLM', 'DeepSeek', 'ChatGPT', '产品经理', '产品助理', '需求分析', 'PRD', '原型',
+    '用户调研', '用户研究', '竞品分析', '数据分析', 'B端', 'SaaS', '教育', '招聘', '运营', '项目管理', '沟通协作',
+    'SQL', 'Python', 'Figma', 'Axure', 'MVP', '上线', '作品集', '埋点', '转化', '留存', '用户反馈', '商业化'
+  ];
+  const normalized = normalizeText(text);
+  return uniqueList(dictionary.filter(keyword => normalized.includes(normalizeText(keyword))));
+}
+function detectHardRequirementRisks(jdText, resumeText) {
+  const jd = normalizeText(jdText);
+  const resume = normalizeText(resumeText);
+  const risks = [];
+  if (/(985|211|双一流)/i.test(jd) && !/(985|211|双一流)/i.test(resume)) risks.push('JD 提到 985 / 211 / 双一流等学校要求，需要人工确认是否为硬筛条件。');
+  if (/硕士|研究生/.test(jd) && !/硕士|研究生/.test(resume)) risks.push('JD 提到硕士或研究生要求，当前简历未体现该学历信息。');
+  if (/(3年|三年|5年|五年|多年).{0,8}(经验|经历)|经验.{0,8}(3年|三年|5年|五年)/.test(jd)) risks.push('JD 提到多年经验要求，对应届 / 初级求职者可能不友好。');
+  if (/必须|硬性|强制|大厂|头部/.test(jd) && !/大厂|头部|实习/.test(resume)) risks.push('JD 中存在“必须 / 大厂 / 头部”等偏硬筛表达，需要谨慎评估。');
+  if (/行业经验|垂直行业|教育行业|招聘行业|金融行业|医疗行业/.test(jd) && !/行业|教育|招聘|金融|医疗/.test(resume)) risks.push('JD 可能要求特定行业经验，当前简历行业场景证据不足。');
+  return risks;
+}
+function calculateApplicationScore(jdNeeds, matchedGroups, missingGroups, hardRisks, resumeText, jdText, infoInsufficient) {
+  if (infoInsufficient) return 55;
+  const coverage = jdNeeds.length ? matchedGroups.length / jdNeeds.length : 0.35;
+  const evidenceBonus = ['项目', '上线', '作品集', '用户', '反馈', '数据', '原型', 'PRD', 'Prompt'].filter(word => resumeText.includes(word)).length * 2;
+  const jdPenalty = missingGroups.length * 3 + hardRisks.length * 8;
+  return clamp(Math.round(54 + coverage * 34 + evidenceBonus - jdPenalty), 35, 94);
+}
+function getMatchLevel(score) {
+  if (score >= 80) return '高匹配';
+  if (score >= 65) return '中等匹配';
+  if (score >= 50) return '低匹配';
+  return '不匹配';
+}
+function getApplyRecommendation(score, hasHardRisk) {
+  if (score >= 80 && !hasHardRisk) return '值得重点投';
+  if (score >= 65) return '可以投但不建议重点';
+  if (score >= 50) return '不建议投';
+  return '信息不足，需要人工判断';
+}
+function buildJdBreakdown(jdNeeds, hardRisks, jdText) {
+  const coreResponsibilities = uniqueList([
+    ...jdNeeds.map(group => group.requirement),
+    hasAny(normalizeText(jdText), ['沟通', '协作']) ? '跨角色沟通与需求推进' : '',
+    '围绕岗位目标产出可复用结果'
+  ]).filter(Boolean).slice(0, 6);
+  return {
+    coreResponsibilities: coreResponsibilities.length ? coreResponsibilities : ['岗位职责信息不足，建议补充更完整 JD 后复核。'],
+    hardRequirements: uniqueList([
+      ...hardRisks,
+      hasAny(normalizeText(jdText), ['本科', '学历']) ? 'JD 包含学历要求，需要确认是否为硬性筛选。' : '',
+      hasAny(normalizeText(jdText), ['经验', '实习']) ? 'JD 包含经验要求，需要用项目或实习证据回应。' : ''
+    ]).filter(Boolean).slice(0, 6),
+    bonusPoints: uniqueList([
+      hasAny(normalizeText(jdText), ['ai', 'aigc', 'agent', 'rag']) ? '有 AI / AIGC / Agent 实践会明显加分。' : '',
+      hasAny(normalizeText(jdText), ['数据', 'sql', '指标']) ? '能用数据指标复盘产品效果会加分。' : '',
+      hasAny(normalizeText(jdText), ['figma', '原型', 'axure']) ? '有原型设计和可体验 Demo 会加分。' : '',
+      '能讲清项目从需求到上线或验证的闭环。'
+    ]).filter(Boolean).slice(0, 5),
+    hiddenRequirements: ['能把模糊需求拆成具体任务', '能和业务 / 技术 / 运营协作推进', '能接受结果不确定并做人工复核', '能用清晰表达降低团队沟通成本'],
+    risks: hardRisks.length ? hardRisks : ['暂未发现明显硬性坑点，但仍建议确认工作强度、考核方式和真实职责边界。'],
+    interviewFocus: uniqueList([
+      ...jdNeeds.slice(0, 4).map(group => group.requirement),
+      '项目中你实际负责的部分',
+      'AI 输出不稳定时的兜底策略'
+    ]).slice(0, 6)
+  };
+}
+function buildResumeMatches(matchedGroups, resumeText) {
+  return uniqueList([
+    ...matchedGroups.map(group => group.strength),
+    hasAny(normalizeText(resumeText), ['python', 'sql']) ? '技能匹配：简历中出现 Python / SQL 等数据或技术工具，可支撑 AI 产品沟通和分析。' : '',
+    hasAny(normalizeText(resumeText), ['项目', '上线', 'github']) ? '项目匹配：简历中有项目或上线线索，可用于证明不是停留在想法层。' : '',
+    hasAny(normalizeText(resumeText), ['figma', 'axure', '原型']) ? '工具经验匹配：有原型工具或页面表达经验。' : '',
+    hasAny(normalizeText(resumeText), ['作品集', '链接', 'http']) ? '作品集匹配：已有链接或作品集线索，适合在投递沟通中突出。' : ''
+  ]).filter(Boolean).slice(0, 8);
+}
+function buildResumeWeaknesses(missingGroups, hardRisks, resumeText, jdText) {
+  return uniqueList([
+    ...missingGroups.map(group => group.weakness),
+    ...hardRisks,
+    !hasAny(normalizeText(resumeText), ['数据', '指标', '反馈']) ? '缺少真实数据 / 用户反馈 / 结果复盘，可信度还可以继续加强。' : '',
+    hasAny(normalizeText(jdText), ['商业化', '增长', '转化']) && !hasAny(normalizeText(resumeText), ['商业化', '增长', '转化']) ? '业务场景和商业化验证不够贴近 JD。' : ''
+  ]).filter(Boolean).slice(0, 8);
+}
+function buildOptimizationSuggestions(missingGroups, hardRisks, coveredKeywords, missingKeywords, jobTitle) {
+  return [
+    {
+      module: '个人总结',
+      problem: '当前总结如果过泛，会让 HR 难以判断你和该岗位的直接关系。',
+      direction: `围绕「${jobTitle}」突出 2-3 个最贴 JD 的能力。`,
+      recommendedExpression: `具备 AI 产品 / 产品助理相关项目实践，能够完成需求拆解、原型表达、Prompt 工作流设计和结果复盘，关注从用户场景到可体验 MVP 的落地。`
+    },
+    {
+      module: '技能描述',
+      problem: missingKeywords.length ? `JD 关键词中仍缺少 ${missingKeywords.slice(0, 4).join('、')} 等表达。` : '技能关键词覆盖较好，但需要按岗位语境组织。',
+      direction: '把工具名和使用场景放在一起写，不只堆关键词。',
+      recommendedExpression: `技能：${uniqueList([...coveredKeywords, ...missingKeywords.slice(0, 4)]).slice(0, 8).join('、')}；可结合产品需求拆解、数据分析和 AI 工作流验证使用。`
+    },
+    {
+      module: '项目经历',
+      problem: '项目如果只写做了什么工具，无法体现产品判断和岗位匹配。',
+      direction: '按“用户场景-问题-方案-个人职责-结果”改写。',
+      recommendedExpression: `围绕求职 / AI 产品场景，负责需求拆解、核心流程设计、结果页结构化和异常兜底；通过本地记录、复制导出和反馈入口提升结果复用效率。`
+    },
+    {
+      module: '实习 / 工作经历',
+      problem: hardRisks.length ? 'JD 可能对经验有硬性要求，需要用项目闭环补足经验感。' : '经历描述需要更明确个人职责。',
+      direction: '突出你负责的环节、协作对象和可验证产出。',
+      recommendedExpression: `参与需求沟通、竞品拆解、原型迭代和数据复盘，能将模糊问题拆成可执行任务，并和相关角色对齐交付标准。`
+    },
+    {
+      module: '作品集 / 项目链接',
+      problem: '如果没有链接，项目可信度会下降；如果有链接但不突出，也容易被忽略。',
+      direction: '把最贴 JD 的项目链接放在项目标题或个人总结附近。',
+      recommendedExpression: `作品集：建议放置 1-2 个可打开项目链接，并标注“已上线 / 可体验 / MVP”，方便 HR 快速验证。`
+    }
+  ];
+}
+function buildResumeRewrite(jobTitle, coveredKeywords, missingKeywords, projectLink) {
+  const skillLine = uniqueList([...coveredKeywords, ...missingKeywords.slice(0, 5)]).slice(0, 8).join('、') || '需求分析、PRD、原型设计、数据分析、AI 工具实践';
+  return {
+    summary: `面向${jobTitle}方向，具备 AI 产品 / 产品助理项目实践，熟悉需求拆解、PRD 表达、原型设计、Prompt 工作流和结果复盘。能够从用户场景出发设计可体验 MVP，并关注 AI 输出的人工复核与兜底机制。`,
+    projectExample: `项目经历改写示例：围绕求职岗位匹配场景，设计并实现 AI 求职分析工具，负责用户流程拆解、JD 输入确认、简历档案本地化、匹配结果结构化和求职记录沉淀。项目支持可复制话术、面试准备和 Mock 兜底，体现从需求到可体验产品的闭环。项目链接：${projectLink}`,
+    skillsExample: `技能描述改写示例：掌握${skillLine}，能够结合岗位 JD 拆解核心职责、提炼关键词，并将项目经历改写为更贴近岗位要求的表达。`
+  };
+}
+function buildOutreachScripts(companyName, jobTitle, resumeMatches, projectLink) {
+  const company = companyName || '贵公司';
+  const match = (resumeMatches[0] || '我有 AI 产品项目和需求拆解实践').replace(/。$/, '');
+  return {
+    boss: `您好，我想了解下${company}的${jobTitle}岗位。我做过 AI 求职分析工具，比较熟悉需求拆解、原型和 Prompt 工作流，项目链接：${projectLink}。想请问这个岗位目前还在招吗？`,
+    wechat: `您好，我是刚刚沟通过${jobTitle}岗位的候选人。我的经历和岗位里需求拆解、AI 产品落地、结果复盘这几块比较相关，尤其是做过一个可体验的 AI 求职分析工具。项目链接：${projectLink}。如果方便，我想进一步了解岗位当前主要负责的业务方向和试用期重点。`,
+    emailSubject: `${jobTitle}岗位投递 - AI 产品 / 产品助理方向候选人`,
+    emailBody: `您好，\n\n我想投递${company}的${jobTitle}岗位。${match}，并有可体验项目可供参考：${projectLink}。\n\n我比较关注 AI 产品从需求拆解、原型验证到结果复盘的完整流程，也能接受在早期阶段通过人工复核和兜底机制提升稳定性。期待有机会进一步沟通。\n\n谢谢。`,
+    attachmentReminder: '附件建议包含：PDF 简历、作品集链接说明；文件名建议写清姓名 + 岗位方向。'
+  };
+}
+function buildFullInterviewPrep(jdBreakdown, resumeWeaknesses, missingGroups) {
+  return {
+    jdQuestions: jdBreakdown.coreResponsibilities.slice(0, 5).map(item => `你如何理解「${item}」，过去哪个项目能证明？`),
+    projectQuestions: ['这个项目的目标用户是谁，真实痛点是什么？', '你在项目里具体负责了哪些环节？', '如果让你重做一次，你会优先优化哪里？', '项目有没有上线、反馈或数据结果？'],
+    weaknessQuestions: resumeWeaknesses.slice(0, 4).map(item => `针对「${item}」，你准备如何解释或补强？`),
+    aiProductQuestions: ['如果 AI 输出不稳定，你会怎么设计兜底？', '你如何判断一个 AI 功能是否真的解决用户问题？', 'Prompt、工作流和产品体验之间是什么关系？', '怎样避免 AI 产品过度承诺？'],
+    hrQuestions: ['你为什么想做这个方向？', '你怎么看待初级岗位的重复性工作？', '你最近一次主动学习并落地的东西是什么？', '你期望的团队协作方式是什么？']
+  };
+}
+function buildSelfIntroduction(jobTitle, coveredKeywords, projectLink) {
+  const keywords = coveredKeywords.slice(0, 4).join('、') || '需求分析、原型设计、AI 工具实践';
+  return `您好，我想应聘${jobTitle}岗位。我目前的优势主要在${keywords}几个方面。之前我做过一个 AI 求职分析工具，从简历档案、JD 输入确认、匹配分析到求职记录，都围绕应届生投递前的真实场景设计，并做了本地隐私保存和 Mock 兜底。这个项目让我比较熟悉从用户痛点拆解需求、设计可体验流程、再把结果结构化复用的过程。项目链接是：${projectLink}。我希望在这个岗位里继续把 AI 能力落到具体业务流程中，同时也愿意从基础需求、原型、数据复盘和跨团队沟通做起。`;
+}
+function flattenInterviewPrep(prep = {}) {
+  return [
+    ...arr(prep.jdQuestions),
+    ...arr(prep.projectQuestions),
+    ...arr(prep.weaknessQuestions),
+    ...arr(prep.aiProductQuestions),
+    ...arr(prep.hrQuestions)
+  ].slice(0, 12);
+}
+function extractCompanyName(jdText) {
+  const line = jdText.split(/\n/).find(v => /公司|企业/.test(v));
+  return line ? line.replace(/公司名称|企业名称|公司|企业|[:：]/g, '').trim().slice(0, 30) : '';
+}
+function extractCity(jdText) {
+  const line = jdText.split(/\n/).find(v => /城市|地点|工作地|办公/.test(v));
+  return line ? line.replace(/工作地点|办公地点|城市|地点|[:：]/g, '').trim().slice(0, 30) : '';
+}
+function extractSalary(jdText) {
+  const match = jdText.match(/\d+\s*[-~到]\s*\d+\s*[kK千万]?|\d+\s*[kK]\s*[-~到]\s*\d+\s*[kK]/);
+  return match ? match[0] : '';
 }
 const KEYWORD_GROUPS = [
   {
@@ -1187,34 +3586,46 @@ function scoreByKeywords(resumeText, jdText, profile) {
   return clamp(Math.round(58 + coverage * 24 + evidenceBonus - Math.max(profile.weaknesses.length - 2, 0) * 2), 52, 90);
 }
 function renderResult(result) {
-  const level = result.score >= 80 ? '匹配度较高' : result.score >= 65 ? '具备投递基础' : '需要重点补强';
+  const missingCount = result.keywordAnalysis.missing.length;
+  const weaknessCount = result.resumeWeaknesses.length;
   resultContent.innerHTML = `
     <div class="score-card">
       <div>
-        <div class="score-num">${result.score}</div>
-        <div>匹配评分 / 100</div>
+        <div class="score-num">${result.matchScore}</div>
+        <div>岗位匹配度 / 100</div>
       </div>
       <div>
-        <span class="badge">${level}</span>
+        <span class="badge">${escapeHtml(result.matchLevel)} · ${escapeHtml(result.applyRecommendation)}</span>
         <h2>${escapeHtml(result.jobTitle)}</h2>
         <p>${escapeHtml(result.summary)}</p>
-        <p>分析依据来自你粘贴的简历文本和岗位 JD，不包含图片、PDF 或附件内容。</p>
+        <div class="score-meta">
+          <div><strong>${escapeHtml(result.companyName || '未填写')}</strong><span>公司名</span></div>
+          <div><strong>${escapeHtml(result.city || '未填写')}</strong><span>城市</span></div>
+          <div><strong>${weaknessCount}</strong><span>主要短板</span></div>
+          <div><strong>${missingCount}</strong><span>缺失关键词</span></div>
+        </div>
       </div>
     </div>
     <div class="ops">
-      <button class="secondary-btn" type="button" onclick="copyMarkdown()">复制分析结果</button>
+      <button class="primary-btn" type="button" onclick="saveCurrentJobRecord()">保存到求职记录</button>
+      <button class="secondary-btn" type="button" onclick="copyMarkdown()">复制完整分析包</button>
       <button class="secondary-btn" type="button" onclick="downloadMarkdown()">导出 Markdown</button>
       <button class="plain-btn" type="button" onclick="runAnalyze()">重新生成</button>
     </div>
     <div class="result-grid">
-      ${renderCard('岗位核心要求', result.coreRequirements, 'tag')}
-      ${renderCard('关键词缺失提醒', result.missingKeywords, 'tag')}
-      ${renderCard('简历匹配优势', result.strengths)}
-      ${renderCard('简历明显短板', result.weaknesses)}
-      ${renderCard('简历修改建议', result.resumeSuggestions, 'list', true)}
-      ${renderCard('面试可能被问的问题', result.interviewQuestions)}
-      <div class="result-card wide"><h3>HR 打招呼话术建议</h3><p>${escapeHtml(result.hrMessage)}</p></div>
-      ${renderCard('下一步行动建议', result.nextActions, 'list', true)}
+      ${renderJdBreakdown(result.jdBreakdown)}
+      ${renderCard('简历匹配点', result.resumeMatches)}
+      ${renderCard('简历短板', result.resumeWeaknesses)}
+      ${renderKeywordCard(result.keywordAnalysis)}
+      ${renderOptimizationCard(result.optimizationSuggestions)}
+      ${renderRewriteCard(result.resumeRewrite)}
+      ${renderOutreachCard(result.outreachScripts)}
+      ${renderInterviewCard(result.interviewPrep)}
+      ${renderCopyCard('自我介绍建议（60 秒）', result.selfIntroduction, 'selfIntroduction')}
+      ${renderCard('反问问题', result.reverseQuestions, 'list', true)}
+    </div>
+    <div class="notice">
+      以上内容仅用于求职准备参考，不代表招聘结果，不保证面试或录用。请结合岗位真实要求、个人经历和 HR 沟通结果进行判断。
     </div>
     <div class="feedback-box">
       <h3>结果反馈</h3>
@@ -1231,23 +3642,258 @@ function renderResult(result) {
   resultPanel.classList.add('visible');
   resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+function renderJdBreakdown(jd) {
+  return `<div class="result-card wide">
+    <h3>JD 拆解</h3>
+    <div class="result-grid">
+      ${renderMiniList('核心职责', jd.coreResponsibilities)}
+      ${renderMiniList('硬性要求', jd.hardRequirements)}
+      ${renderMiniList('加分项', jd.bonusPoints)}
+      ${renderMiniList('隐性要求', jd.hiddenRequirements)}
+      ${renderMiniList('岗位风险 / JD 里的坑', jd.risks)}
+      ${renderMiniList('面试可能重点考察内容', jd.interviewFocus)}
+    </div>
+  </div>`;
+}
+function renderMiniList(title, items) {
+  const safeItems = items.length ? items : ['暂无明显信息。'];
+  return `<div class="module-item"><strong>${title}</strong><ul class="item-list">${safeItems.map(v => `<li>${escapeHtml(v)}</li>`).join('')}</ul></div>`;
+}
+function renderKeywordCard(keywordAnalysis) {
+  return `<div class="result-card wide">
+    <h3>关键词缺失</h3>
+    <div class="result-grid">
+      ${renderMiniList('已覆盖关键词', keywordAnalysis.covered)}
+      ${renderMiniList('缺失关键词', keywordAnalysis.missing)}
+      ${renderMiniList('建议补强关键词', keywordAnalysis.suggested)}
+    </div>
+  </div>`;
+}
+function renderOptimizationCard(items) {
+  const rows = items.map(item => `
+    <div class="module-item">
+      <strong>${escapeHtml(item.module || '简历模块')}</strong>
+      <p><b>当前问题：</b>${escapeHtml(item.problem || '')}</p>
+      <p><b>修改方向：</b>${escapeHtml(item.direction || '')}</p>
+      <p><b>推荐表达：</b>${escapeHtml(item.recommendedExpression || '')}</p>
+    </div>
+  `).join('');
+  return `<div class="result-card wide">
+    <div class="result-section-head"><h3>简历逐段优化建议</h3><button class="mini-btn" type="button" onclick="copyResultSection('optimization')">复制</button></div>
+    <div class="module-list">${rows}</div>
+  </div>`;
+}
+function renderRewriteCard(rewrite) {
+  const text = buildResumeRewriteText(rewrite);
+  return `<div class="result-card wide">
+    <div class="result-section-head"><h3>可复制的简历改写内容</h3><button class="mini-btn" type="button" onclick="copyResultSection('rewrite')">复制</button></div>
+    <div class="copy-block">${escapeHtml(text)}</div>
+  </div>`;
+}
+function renderOutreachCard(scripts) {
+  return `<div class="result-card wide">
+    <h3>打招呼与投递话术</h3>
+    ${renderScriptBlock('BOSS 打招呼话术', scripts.boss, 'boss')}
+    ${renderScriptBlock('微信沟通话术', scripts.wechat, 'wechat')}
+    ${renderScriptBlock('邮件投递话术', `标题：${scripts.emailSubject}\n\n${scripts.emailBody}\n\n${scripts.attachmentReminder}`, 'email')}
+  </div>`;
+}
+function renderScriptBlock(title, text, key) {
+  return `<div class="module-item">
+    <div class="result-section-head"><strong>${title}</strong><button class="mini-btn" type="button" onclick="copyResultSection('${key}')">复制</button></div>
+    <div class="copy-block">${escapeHtml(text)}</div>
+  </div>`;
+}
+function renderInterviewCard(prep) {
+  return `<div class="result-card wide">
+    <h3>面试准备问题</h3>
+    <div class="result-grid">
+      ${renderMiniList('JD 相关问题', prep.jdQuestions)}
+      ${renderMiniList('简历项目深挖问题', prep.projectQuestions)}
+      ${renderMiniList('短板验证问题', prep.weaknessQuestions)}
+      ${renderMiniList('AI / 产品能力问题', prep.aiProductQuestions)}
+      ${renderMiniList('HR 常规问题', prep.hrQuestions)}
+    </div>
+  </div>`;
+}
+function renderCopyCard(title, text, key) {
+  return `<div class="result-card wide">
+    <div class="result-section-head"><h3>${title}</h3><button class="mini-btn" type="button" onclick="copyResultSection('${key}')">复制</button></div>
+    <div class="copy-block">${escapeHtml(text)}</div>
+  </div>`;
+}
 function renderCard(title, items, mode = 'list', wide = false) {
   const listClass = mode === 'tag' ? 'tag-list' : 'item-list';
   const safeItems = items.length ? items : ['暂无明显信息，建议补充更完整内容后重新分析。'];
   return `<div class="result-card ${wide ? 'wide' : ''}"><h3>${title}</h3><ul class="${listClass}">${safeItems.map(v => `<li>${escapeHtml(v)}</li>`).join('')}</ul></div>`;
 }
+function buildResumeRewriteText(rewrite = {}) {
+  return [
+    `【个人总结】\n${rewrite.summary || ''}`,
+    `【项目经历改写示例】\n${rewrite.projectExample || ''}`,
+    `【技能描述改写示例】\n${rewrite.skillsExample || ''}`
+  ].join('\n\n');
+}
+function buildOptimizationText(items = []) {
+  return items.map(item => [
+    `【${item.module || '简历模块'}】`,
+    `当前问题：${item.problem || ''}`,
+    `修改方向：${item.direction || ''}`,
+    `推荐表达：${item.recommendedExpression || ''}`
+  ].join('\n')).join('\n\n');
+}
+function getResultSectionText(key) {
+  if (!currentResult) return '';
+  const scripts = currentResult.outreachScripts || {};
+  const map = {
+    optimization: buildOptimizationText(currentResult.optimizationSuggestions),
+    rewrite: buildResumeRewriteText(currentResult.resumeRewrite),
+    boss: scripts.boss || '',
+    wechat: scripts.wechat || '',
+    email: `标题：${scripts.emailSubject || ''}\n\n${scripts.emailBody || ''}\n\n${scripts.attachmentReminder || ''}`,
+    selfIntroduction: currentResult.selfIntroduction || ''
+  };
+  return map[key] || '';
+}
+async function copyResultSection(key) {
+  const text = getResultSectionText(key);
+  if (!text) return setStatus('暂无可复制内容。', 'error');
+  try {
+    if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+    else fallbackCopy(text);
+    setStatus('内容已复制。', 'success');
+  } catch {
+    fallbackCopy(text);
+    setStatus('已使用兼容模式复制内容。', 'success');
+  }
+}
+function createJobRecordFromResult(result) {
+  const draft = getJobDraft();
+  const sanitizedReport = sanitizeReportForRecord(result);
+  return {
+    id: String(Date.now()),
+    companyName: result.companyName || draft.companyName || '',
+    jobTitle: result.jobTitle || draft.jobTitle || '目标岗位',
+    city: result.city || draft.city || '',
+    salaryRange: result.salaryRange || draft.salaryRange || '',
+    matchScore: result.matchScore,
+    applyRecommendation: result.applyRecommendation,
+    strengthsSummary: result.resumeMatches.slice(0, 3).join('；'),
+    weaknessesSummary: result.resumeWeaknesses.slice(0, 3).join('；'),
+    missingKeywords: result.keywordAnalysis.missing.slice(0, 12),
+    generatedAt: new Date().toLocaleString(),
+    status: '未投递',
+    reportSummary: result.summary,
+    fullReport: sanitizedReport,
+    jdSnapshot: buildJdSnapshot(getConfirmedJobText(), draft)
+  };
+}
+function sanitizeReportForRecord(value) {
+  if (Array.isArray(value)) return value.map(item => sanitizeReportForRecord(item));
+  if (value && typeof value === 'object') {
+    const blockedKeys = ['resumeText', 'apiKey', 'userApiKey', 'legacyApiKey'];
+    return Object.fromEntries(Object.entries(value)
+      .filter(([key]) => !blockedKeys.includes(key))
+      .map(([key, item]) => [key, sanitizeReportForRecord(item)]));
+  }
+  if (typeof value === 'string' && /^data:image\//i.test(value)) return '[图片内容已移除]';
+  return value;
+}
+function buildJdSnapshot(jdText, draft) {
+  const compact = cleanLine(jdText).slice(0, 500);
+  return {
+    summary: compact,
+    sourceType: draft.sourceType,
+    jdConfirmed: draft.jdConfirmed,
+    screenshotFiles: (draft.screenshotFiles || []).map(file => ({
+      name: file.name,
+      size: file.size,
+      width: file.width,
+      height: file.height,
+      uploadedAt: file.uploadedAt
+    }))
+  };
+}
+function saveCurrentJobRecord() {
+  if (!currentResult) return setStatus('请先生成完整求职分析包，再保存到求职记录。', 'error');
+  const records = getJobRecords();
+  const record = createJobRecordFromResult(currentResult);
+  records.unshift(record);
+  localStorage.setItem(STORAGE.jobRecords, JSON.stringify(records.slice(0, 50)));
+  renderJobRecords();
+  renderLocalDataStatus();
+  trackEvent('save_job_record', {
+    metadata: {
+      matchScoreRange: matchScoreRange(record.matchScore),
+      applyRecommendation: record.applyRecommendation,
+      missingKeywordCount: (record.missingKeywords || []).length
+    }
+  });
+  setStatus('已保存到求职记录。记录不包含完整简历原文。', 'success');
+}
+function getJobRecords() {
+  try { return JSON.parse(localStorage.getItem(STORAGE.jobRecords) || '[]'); }
+  catch { return []; }
+}
+function renderJobRecords() {
+  const records = getJobRecords();
+  if (!records.length) {
+    jobRecordsList.innerHTML = '<div class="empty">暂无求职记录。生成分析包后可手动保存。</div>';
+    return;
+  }
+  jobRecordsList.innerHTML = records.map(record => `
+    <div class="history-item">
+      <strong>${escapeHtml(record.companyName || '未填写公司')} · ${escapeHtml(record.jobTitle)} · ${escapeHtml(record.matchScore)}分</strong>
+      <small>${escapeHtml(record.generatedAt)} · ${escapeHtml(record.status)}</small>
+      <p class="hint">${escapeHtml(record.applyRecommendation)}｜缺失：${escapeHtml((record.missingKeywords || []).slice(0, 4).join('、') || '暂无明显缺失')}</p>
+      <div class="history-actions">
+        <button class="mini-btn" type="button" onclick="loadJobRecord('${record.id}')">查看</button>
+        <button class="mini-btn" type="button" onclick="deleteJobRecord('${record.id}')">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+function loadJobRecord(id) {
+  const record = getJobRecords().find(item => item.id === id);
+  if (!record) return;
+  currentResult = normalizeResult(record.fullReport);
+  renderResult(currentResult);
+  setStatus('已打开求职记录中的完整分析包。', 'success');
+}
+function deleteJobRecord(id) {
+  const records = getJobRecords().filter(item => item.id !== id);
+  localStorage.setItem(STORAGE.jobRecords, JSON.stringify(records));
+  renderJobRecords();
+  renderLocalDataStatus();
+  trackEvent('delete_job_record');
+  setStatus('已删除该条求职记录。');
+}
+function clearJobRecords() {
+  const ok = confirmAction('确认清空全部求职记录吗？清空后无法恢复。');
+  if (!ok) return;
+  localStorage.removeItem(STORAGE.jobRecords);
+  renderJobRecords();
+  renderLocalDataStatus();
+  setStatus('求职记录已清空。');
+}
 function saveHistory(result) {
   const records = getHistory();
   const id = String(Date.now());
+  const profile = getResumeProfile();
+  const draft = getJobDraft();
   records.unshift({
     id,
     jobTitle: result.jobTitle,
     createdAt: new Date().toLocaleString(),
     score: result.score,
     summary: result.summary,
-    result,
-    resumeText: resumeInput.value.trim(),
-    jdText: jdInput.value.trim()
+    result: sanitizeReportForRecord(result),
+    resumeSummary: profile?.experienceSummary || profile?.projectSummary || buildResumePreview(profile?.resumeText || ''),
+    jdSnapshot: buildJdSnapshot(getConfirmedJobText(), draft),
+    jobDraft: {
+      ...draft,
+      screenshotFiles: draft.screenshotFiles || []
+    }
   });
   localStorage.setItem(STORAGE.history, JSON.stringify(records.slice(0, 20)));
   return id;
@@ -1277,9 +3923,9 @@ function renderHistory() {
 function loadHistory(id) {
   const record = getHistory().find(r => r.id === id);
   if (!record) return;
-  currentResult = record.result;
+  currentResult = normalizeResult(record.result);
   currentRecordId = id;
-  renderResult(record.result);
+  renderResult(currentResult);
   setStatus('已打开历史分析记录。你可以复制、导出或基于当前输入重新分析。', 'success');
 }
 function deleteHistory(id) {
@@ -1305,36 +3951,118 @@ function submitFeedback() {
     id: String(Date.now()),
     historyId: currentRecordId,
     rating: feedbackChoice,
-    comment: $('feedbackText')?.value.trim() || '',
+    comment: sanitizeSensitiveText($('feedbackText')?.value.trim() || '').slice(0, 300),
     createdAt: new Date().toLocaleString()
   });
   localStorage.setItem(STORAGE.feedback, JSON.stringify(records.slice(0, 50)));
+  trackEvent('submit_feedback', {
+    metadata: {
+      feedbackType: '分析结果反馈',
+      rating: feedbackChoice,
+      contentLengthBucket: textLengthBucket($('feedbackText')?.value || '')
+    }
+  });
+  renderAnalyticsDashboard();
   setStatus('反馈已保存到当前浏览器。后续可以升级为数据库或表单收集。', 'success');
 }
 function getFeedback() {
   try { return JSON.parse(localStorage.getItem(STORAGE.feedback) || '[]'); }
   catch { return []; }
 }
+function submitSiteFeedback() {
+  const type = siteFeedbackType?.value || '其他';
+  const rawText = siteFeedbackText?.value.trim() || '';
+  const contact = siteFeedbackContact?.value.trim() || '';
+  if (rawText.length < 3) {
+    setStatus('请先填写反馈内容。', 'error');
+    return;
+  }
+  const sanitizedContent = sanitizeSensitiveText(rawText).slice(0, 500);
+  const record = {
+    id: String(Date.now()),
+    feedbackType: type,
+    content: sanitizedContent,
+    hasContact: Boolean(contact),
+    createdAt: new Date().toLocaleString()
+  };
+  if (!analyticsEnabled()) {
+    const records = getFeedbackRecords();
+    records.unshift(record);
+    localStorage.setItem(STORAGE.feedbackRecords, JSON.stringify(records.slice(0, 80)));
+  }
+  trackEvent('submit_feedback', {
+    metadata: {
+      feedbackType: type,
+      contentLengthBucket: textLengthBucket(rawText),
+      hasContact: Boolean(contact),
+      savedLocally: !analyticsEnabled()
+    }
+  });
+  if (siteFeedbackText) siteFeedbackText.value = '';
+  if (siteFeedbackContact) siteFeedbackContact.value = '';
+  renderAnalyticsDashboard();
+  setStatus('反馈已提交。当前不会保存具体联系方式，也不会记录简历原文、完整 JD 或 API Key。', 'success');
+}
+function getFeedbackRecords() {
+  try {
+    const records = JSON.parse(localStorage.getItem(STORAGE.feedbackRecords) || '[]');
+    return Array.isArray(records) ? records : [];
+  } catch {
+    return [];
+  }
+}
+function sanitizeSensitiveText(text) {
+  return String(text || '')
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, '[已移除 API Key]')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[已移除邮箱]')
+    .replace(/\b1[3-9]\d{9}\b/g, '[已移除手机号]')
+    .replace(/\b\d{17}[\dXx]\b/g, '[已移除身份证号]')
+    .replace(/\b\d{13,19}\b/g, '[已移除长数字]');
+}
 function buildMarkdown(result = currentResult) {
   if (!result) return '';
   const lines = [
-    `# 简历分析结果：${result.jobTitle}`,
+    `# 完整求职分析包：${result.jobTitle}`,
     '',
-    `- 匹配评分：${result.score}/100`,
+    `- 公司：${result.companyName || '未填写'}`,
+    `- 城市：${result.city || '未填写'}`,
+    `- 薪资：${result.salaryRange || '未填写'}`,
+    `- 岗位匹配度：${result.matchScore}/100（${result.matchLevel}）`,
+    `- 是否值得投：${result.applyRecommendation}`,
     `- 摘要：${result.summary}`,
     `- 生成时间：${new Date().toLocaleString()}`,
     '',
-    sectionMd('岗位核心要求', result.coreRequirements),
-    sectionMd('简历匹配优势', result.strengths),
-    sectionMd('简历明显短板', result.weaknesses),
-    sectionMd('关键词缺失提醒', result.missingKeywords),
-    sectionMd('简历修改建议', result.resumeSuggestions),
-    sectionMd('面试可能被问的问题', result.interviewQuestions),
-    `## HR 打招呼话术建议\n\n${result.hrMessage}`,
+    sectionMd('JD 拆解 - 核心职责', result.jdBreakdown.coreResponsibilities),
+    sectionMd('JD 拆解 - 硬性要求', result.jdBreakdown.hardRequirements),
+    sectionMd('JD 拆解 - 加分项', result.jdBreakdown.bonusPoints),
+    sectionMd('JD 拆解 - 隐性要求', result.jdBreakdown.hiddenRequirements),
+    sectionMd('JD 拆解 - 岗位风险 / JD 里的坑', result.jdBreakdown.risks),
+    sectionMd('JD 拆解 - 面试重点', result.jdBreakdown.interviewFocus),
+    sectionMd('简历匹配点', result.resumeMatches),
+    sectionMd('简历短板', result.resumeWeaknesses),
+    sectionMd('已覆盖关键词', result.keywordAnalysis.covered),
+    sectionMd('缺失关键词', result.keywordAnalysis.missing),
+    sectionMd('建议补强关键词', result.keywordAnalysis.suggested),
+    `## 简历逐段优化建议\n\n${buildOptimizationText(result.optimizationSuggestions)}`,
     '',
-    sectionMd('下一步行动建议', result.nextActions),
+    `## 可复制的简历改写内容\n\n${buildResumeRewriteText(result.resumeRewrite)}`,
+    '',
+    `## BOSS 打招呼话术\n\n${result.outreachScripts.boss}`,
+    '',
+    `## 微信沟通话术\n\n${result.outreachScripts.wechat}`,
+    '',
+    `## 邮件投递话术\n\n标题：${result.outreachScripts.emailSubject}\n\n${result.outreachScripts.emailBody}\n\n${result.outreachScripts.attachmentReminder}`,
+    '',
+    sectionMd('面试准备 - JD 相关问题', result.interviewPrep.jdQuestions),
+    sectionMd('面试准备 - 简历项目深挖问题', result.interviewPrep.projectQuestions),
+    sectionMd('面试准备 - 短板验证问题', result.interviewPrep.weaknessQuestions),
+    sectionMd('面试准备 - AI / 产品能力问题', result.interviewPrep.aiProductQuestions),
+    sectionMd('面试准备 - HR 常规问题', result.interviewPrep.hrQuestions),
+    `## 自我介绍建议（60 秒）\n\n${result.selfIntroduction}`,
+    '',
+    sectionMd('反问问题', result.reverseQuestions),
     '---',
-    '说明：AI 输出仅供参考，需要结合个人真实经历人工复核。本结果只基于用户粘贴的文本，不包含图片、PDF 或附件解析。'
+    '说明：以上建议仅供求职准备参考，最终判断仍需结合个人情况和 HR 沟通结果。本阶段使用本地规则 / Mock 分析，不接真实 AI。'
   ];
   return lines.join('\n');
 }

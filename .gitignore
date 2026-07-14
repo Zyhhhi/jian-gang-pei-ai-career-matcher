@@ -1,0 +1,8 @@
+.playwright-cli/
+output/
+
+# Local Worker configuration and secrets
+worker/wrangler.toml
+worker/.dev.vars
+.env
+.env.*
