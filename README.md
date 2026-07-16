@@ -8,7 +8,7 @@
 - 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
 - 当前真实可用分析：本地规则 / Mock 分析。
 - 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
-- 当前自带 API Key：只支持本地保存、脱敏显示与清除；真实模型调用尚未接入。
+- 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；平台 AI 仍未开放。
 - 当前平台 AI：仅登录后可选择和查看规则；仍在测试，不会调用 Worker、DeepSeek 或真实后端。
 
 本地演示模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。
@@ -22,7 +22,7 @@
 ### 已登录用户
 
 - 平台 AI：目标规则为成功分析才计次，每日最多 5 次、每月最多 30 次，同时受两个上限约束。真实每日/月度计数与真实模型调用尚未完成。
-- 自带 API Key：目标规则为登录后可用，不占平台次数，费用由用户自己的模型账户承担。Key 默认仅保存在当前浏览器，不上传 Supabase；真实调用尚未完成。
+- 自带 DeepSeek API Key：登录后可用，不占平台次数，费用由用户自己的 DeepSeek 账户承担。Key 默认仅保存在当前浏览器；开始分析前页面会明确提示已确认的简历和 JD 将直接发送给 DeepSeek，且不会经过 Worker、Supabase 或代理。
 
 收费、支付和订单方案已取消。历史数据库中的 `platform_paid_credits` 字段暂时保留以避免破坏既有数据和 migration，但已废弃：前端不展示、不读取、不依赖该字段。
 
@@ -46,6 +46,8 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - `resumeProfile`、`jobDraft`、`jobRecords` 和 `userApiKey` 均保存在当前浏览器 `localStorage`。
 - TXT、PDF、DOCX 只在浏览器本地解析，不上传原始文件。
 - 用户自带 API Key 不写入 URL、Supabase、Worker 日志或代码仓库。
+- 自带 Key 固定请求 `https://api.deepseek.com/chat/completions`，固定模型 `deepseek-v4-flash`；不接受用户填写任意 Base URL。Key 只出现在浏览器到 DeepSeek 的 Authorization 请求头，不进入 Prompt、历史记录、埋点、错误信息或页面日志。
+- 本地浏览器 CORS 探针已由人工验证通过；GitHub Pages 正式域名发布前仍必须用用户本人临时 Key 完成一次 OPTIONS/POST 二次验收。若 CORS 失败，停止自带 Key 发布，不引入代理，也不回退 Mock。
 - 平台 AI 未开放前，前端不会把简历或 JD 发送到 Worker。
 
 ## 平台 AI 安全基线
@@ -89,6 +91,12 @@ node --test tests/otp-auth.contract.test.mjs
 
 ```powershell
 node --test tests/login-mode.contract.test.mjs
+```
+
+自带 DeepSeek Key 直连契约测试：
+
+```powershell
+node --test tests/own-api-direct.contract.test.mjs
 ```
 
 不要在本地检查中连接真实 Supabase、调用真实 DeepSeek、执行 migration 或部署 Worker。

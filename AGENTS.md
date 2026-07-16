@@ -7,9 +7,9 @@
 - 未登录用户只可使用本地 Mock 演示、简历本地导入、JD 本地输入和本地历史记录。
 - 未登录时，平台 AI 与自带 API Key 模式必须锁定；点击必须引导登录，绝不发送 Worker 请求。
 - 本地 Mock 必须明确说明：本模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。
-- 已登录用户后续可选择平台 AI 或自带 API Key。
+- 已登录用户可选择平台 AI 或自带 DeepSeek API Key。
 - 平台 AI 正式目标：成功分析才计次，每日最多 5 次、每月最多 30 次，同时受两个上限约束。
-- 自带 API Key 正式目标：登录后可用，不占平台次数，费用由用户自己的模型账户承担。
+- 自带 DeepSeek API Key：登录后可用，不占平台次数，费用由用户自己的 DeepSeek 账户承担；简历与已确认 JD 由浏览器直接发送到 DeepSeek，不经过平台后端。
 - 付费、支付、订单、购买、购买记录和自动增加额度方案已取消。
 - `platform_paid_credits` 暂时保留在既有数据库 schema 中，但已废弃；前端不得展示、读取或依赖它，不得进行破坏性 migration。
 
@@ -20,9 +20,11 @@
 - `email_otp` 的发送、验证、倒计时与 Mock 测试必须继续保留，但默认隐藏且不得由普通用户触发。只有完成 SMTP 模板与真实验收后，才可将 `LOGIN_MODE` 改为 `email_otp`。
 - 真实 Supabase 邮件模板、邮件服务、OTP 过期时间、发送频率和真实收码登录均未在本阶段配置或验证。管理员只能按 `docs/supabase-email-otp-setup.md` 手动配置，不能把这些待办写成已完成。
 - 产品目标为 6 位验证码，但未读取真实后台配置；前端只接受数字而不固定长度。
-- 当前自带 API Key 仅支持浏览器本地保存、脱敏显示和清除；尚未接入真实模型调用，不得回退为 Mock 后伪装成真实 Key 分析。
+- 自带 DeepSeek API Key 已固定直连 `https://api.deepseek.com/chat/completions`，模型固定为 `deepseek-v4-flash`；Key 仅保存于浏览器 localStorage，不能进入 URL、Prompt、历史、埋点、错误信息、Supabase、Worker 或代码仓库。
+- 自带 Key 调用前必须同时满足：已登录、已保存有效 Key、已确认简历与 JD 将直接发送给 DeepSeek；失败不得回退 Mock，只有通过本地 JSON 结构校验后才可渲染并写入本地历史。
+- 已由本地浏览器探针确认 DeepSeek 直连 CORS 可用；GitHub Pages 正式域名仍须在发布前做一次独立 CORS 验收。若正式域名 CORS 失败，停止该功能发布，不得引入代理。
 - 当前平台 AI 仍处于测试阶段；前端不得调用 Worker、DeepSeek 或真实 Supabase 额度 RPC。
-- 真实每日/月度计数、自带 API Key 调用、真实平台 AI 开放及真实 OTP 端到端验收尚未完成，不得写成已完成。
+- 真实每日/月度计数、真实平台 AI 开放及真实 OTP 端到端验收尚未完成，不得写成已完成。
 
 ## 数据安全边界
 
@@ -48,4 +50,5 @@
 - Worker 改动至少运行 `node --test worker/tests/stage-8.6b-worker.test.mjs`。
 - 页面规则改动至少检查：未登录只能 Mock、非 Mock 不发 Worker、`ENABLE_PLATFORM_AI` 为 false、收费文案和付费埋点已移除、导入函数仍在。
 - 登录模式改动至少运行 `node --test tests/login-mode.contract.test.mjs` 与 `node --test tests/otp-auth.contract.test.mjs`，检查默认 Magic Link redirect、OTP 休眠保留、session 恢复和退出后的门禁。
+- 自带 DeepSeek Key 改动至少运行 `node --test tests/own-api-direct.contract.test.mjs`，检查固定端点、无 Key 请求体泄露、结构校验、错误不回退 Mock 与未登录门禁。
 - 未获明确授权时，不连接真实 Supabase、不执行 migration、不调用真实 DeepSeek、不部署 Worker、不 push。
