@@ -12,7 +12,7 @@
 
 - `DEEPSEEK_API_KEY`：DeepSeek API Key，必须用 Worker secret 保存
 - `SUPABASE_URL`：Supabase 项目 URL
-- `SUPABASE_SERVICE_ROLE_KEY`：Supabase service role key，必须用 Worker secret 保存
+- `SUPABASE_SERVICE_ROLE_KEY`：推荐填写 Supabase 新版 `sb_secret_...` Secret key；也兼容旧版 service role key，必须用 Worker secret 保存
 - `ALLOWED_ORIGIN`：允许访问 Worker 的前端域名，例如 GitHub Pages 域名
 - `DEEPSEEK_MODEL`：默认 `deepseek-v4-pro`
 - `MODEL_TIMEOUT_MS`：可选，默认 `60000`，允许范围 10 到 120000 毫秒

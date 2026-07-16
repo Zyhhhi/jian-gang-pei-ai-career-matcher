@@ -400,16 +400,66 @@ async function supabaseRpc(env, functionName, body, fetchImpl) {
 async function supabaseRest(env, path, options, fetchImpl) {
   const resp = await fetchImpl(`${trimSlash(env.SUPABASE_URL)}${path}`, {
     method: options.method || 'GET',
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json'
-    },
+    headers: buildSupabaseAdminHeaders(env),
     body: options.body
   });
   const text = await resp.text();
-  if (!resp.ok) throw new AppError('SUPABASE_REQUEST_FAILED', 'Supabase request failed.', 503);
+  if (!resp.ok) {
+    const diagnostic = buildSupabaseFailureDiagnostic(path, resp.status, text);
+    console.error('Supabase request failed.', diagnostic);
+    throw new AppError('SUPABASE_REQUEST_FAILED', 'Supabase request failed.', 503, {
+      providerStatus: resp.status
+    });
+  }
   return text ? JSON.parse(text) : [];
+}
+
+export function buildSupabaseFailureDiagnostic(path, status, text) {
+  let payload = {};
+  try {
+    payload = JSON.parse(String(text || ''));
+  } catch {
+    payload = { message: String(text || '') };
+  }
+
+  return {
+    path: String(path || '').split('?')[0].slice(0, 160),
+    status: Number.isFinite(Number(status)) ? Number(status) : null,
+    code: sanitizeDiagnosticValue(payload?.code),
+    message: sanitizeDiagnosticValue(payload?.message || payload?.error),
+    hint: sanitizeDiagnosticValue(payload?.hint)
+  };
+}
+
+function sanitizeDiagnosticValue(value) {
+  const sanitized = String(value || '')
+    .replace(/Bearer\s+\S+/gi, '[redacted-secret]')
+    .replace(/\bsb_secret_[A-Za-z0-9._-]+\b/g, '[redacted-secret]')
+    .replace(/\bsk-[A-Za-z0-9._-]+\b/g, '[redacted-secret]')
+    .replace(/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted-token]')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi, '[redacted-id]')
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted-email]')
+    .replace(/\b1[3-9]\d{9}\b/g, '[redacted-phone]')
+    .replace(/"(?:[^"\\]|\\.){80,}"/g, '"[redacted-value]"')
+    .replace(/'(?:[^'\\]|\\.){80,}'/g, "'[redacted-value]'")
+    .replace(/\s+/g, ' ')
+    .trim();
+  return sanitized.slice(0, 300) || null;
+}
+
+export function buildSupabaseAdminHeaders(env) {
+  const key = String(env?.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const headers = {
+    apikey: key,
+    'Content-Type': 'application/json'
+  };
+
+  // New sb_secret keys are opaque API keys, not JWTs. Legacy service_role
+  // keys still require the Bearer header for backward compatibility.
+  if (!key.startsWith('sb_secret_')) {
+    headers.Authorization = `Bearer ${key}`;
+  }
+  return headers;
 }
 
 function firstRpcRow(rows) {

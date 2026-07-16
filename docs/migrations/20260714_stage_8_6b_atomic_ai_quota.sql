@@ -125,9 +125,9 @@ begin
   -- Serializes the same requestId, including attempts made by another user.
   perform pg_advisory_xact_lock(hashtextextended(p_request_id, 0));
 
-  select * into v_request
-  from public.ai_requests
-  where request_id = p_request_id;
+  select r.* into v_request
+  from public.ai_requests as r
+  where r.request_id = p_request_id;
 
   if found then
     if v_request.user_id <> p_user_id then
@@ -142,7 +142,9 @@ begin
     request_status := v_request.status;
     reserved_quota_type := v_request.quota_type;
 
-    select * into v_quota from public.user_quota where user_id = p_user_id;
+    select q.* into v_quota
+    from public.user_quota as q
+    where q.user_id = p_user_id;
     platform_free_total := coalesce(v_quota.platform_free_total, 3);
     platform_free_used := coalesce(v_quota.platform_free_used, 0);
     platform_free_remaining := greatest(platform_free_total - platform_free_used, 0);
@@ -157,25 +159,25 @@ begin
   on conflict (user_id) do nothing;
 
   -- Serializes all quota reservations for this user.
-  select * into strict v_quota
-  from public.user_quota
-  where user_id = p_user_id
+  select q.* into strict v_quota
+  from public.user_quota as q
+  where q.user_id = p_user_id
   for update;
 
   if v_quota.platform_free_used < v_quota.platform_free_total then
     v_quota_type := 'free';
-    update public.user_quota
-    set platform_free_used = platform_free_used + 1,
+    update public.user_quota as q
+    set platform_free_used = q.platform_free_used + 1,
         updated_at = now()
-    where user_id = p_user_id
-    returning * into v_quota;
+    where q.user_id = p_user_id
+    returning q.* into v_quota;
   elsif v_quota.platform_paid_credits > 0 then
     v_quota_type := 'paid';
-    update public.user_quota
-    set platform_paid_credits = platform_paid_credits - 1,
+    update public.user_quota as q
+    set platform_paid_credits = q.platform_paid_credits - 1,
         updated_at = now()
-    where user_id = p_user_id
-    returning * into v_quota;
+    where q.user_id = p_user_id
+    returning q.* into v_quota;
   else
     outcome := 'no_quota';
     request_status := null;
@@ -219,9 +221,9 @@ as $$
 declare
   v_request public.ai_requests%rowtype;
 begin
-  select * into v_request
-  from public.ai_requests
-  where request_id = p_request_id
+  select r.* into v_request
+  from public.ai_requests as r
+  where r.request_id = p_request_id
   for update;
 
   if not found or v_request.user_id <> p_user_id then
@@ -321,9 +323,9 @@ declare
   v_request public.ai_requests%rowtype;
   v_quota public.user_quota%rowtype;
 begin
-  select * into v_request
-  from public.ai_requests
-  where request_id = p_request_id
+  select r.* into v_request
+  from public.ai_requests as r
+  where r.request_id = p_request_id
   for update;
 
   if not found or v_request.user_id <> p_user_id then
@@ -336,41 +338,43 @@ begin
   elsif v_request.status not in ('reserved', 'processing', 'failed') then
     outcome := 'invalid_state'; request_status := v_request.status; refunded_quota_type := v_request.quota_type;
   else
-    update public.ai_requests
+    update public.ai_requests as r
     set status = 'failed', error_code = left(coalesce(p_error_code, 'UNKNOWN_ERROR'), 80),
         output_chars = greatest(coalesce(p_output_chars, 0), 0),
         duration_ms = greatest(coalesce(p_duration_ms, 0), 0),
         provider_status = p_provider_status,
-        failed_at = coalesce(failed_at, now()), updated_at = now()
-    where id = v_request.id;
+        failed_at = coalesce(r.failed_at, now()), updated_at = now()
+    where r.id = v_request.id;
 
-    select * into strict v_quota
-    from public.user_quota
-    where user_id = p_user_id
+    select q.* into strict v_quota
+    from public.user_quota as q
+    where q.user_id = p_user_id
     for update;
 
     if v_request.quota_type = 'free' then
-      update public.user_quota
-      set platform_free_used = greatest(platform_free_used - 1, 0), updated_at = now()
-      where user_id = p_user_id
-      returning * into v_quota;
+      update public.user_quota as q
+      set platform_free_used = greatest(q.platform_free_used - 1, 0), updated_at = now()
+      where q.user_id = p_user_id
+      returning q.* into v_quota;
     elsif v_request.quota_type = 'paid' then
-      update public.user_quota
-      set platform_paid_credits = platform_paid_credits + 1, updated_at = now()
-      where user_id = p_user_id
-      returning * into v_quota;
+      update public.user_quota as q
+      set platform_paid_credits = q.platform_paid_credits + 1, updated_at = now()
+      where q.user_id = p_user_id
+      returning q.* into v_quota;
     else
       raise exception 'request has no refundable quota type' using errcode = '22023';
     end if;
 
-    update public.ai_requests
+    update public.ai_requests as r
     set status = 'refunded', refunded_at = now(), completed_at = now(), updated_at = now()
-    where id = v_request.id;
+    where r.id = v_request.id;
 
     outcome := 'refunded'; request_status := 'refunded'; refunded_quota_type := v_request.quota_type;
   end if;
 
-  select * into v_quota from public.user_quota where user_id = p_user_id;
+  select q.* into v_quota
+  from public.user_quota as q
+  where q.user_id = p_user_id;
   platform_free_total := coalesce(v_quota.platform_free_total, 3);
   platform_free_used := coalesce(v_quota.platform_free_used, 0);
   platform_free_remaining := greatest(platform_free_total - platform_free_used, 0);
