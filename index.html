@@ -970,11 +970,12 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
           <div class="auth-box">
             <div class="field">
               <label for="loginEmailInput">邮箱登录 / 注册</label>
-              <input id="loginEmailInput" type="email" autocomplete="email" placeholder="输入邮箱，接收登录验证码">
+              <input id="loginEmailInput" type="email" autocomplete="email" placeholder="输入邮箱">
             </div>
             <div class="auth-actions">
               <button class="secondary-btn" type="button" onclick="openLoginPanel()">打开登录区域</button>
-              <button class="primary-btn" id="sendOtpButton" type="button" onclick="sendEmailOtp()">发送验证码</button>
+              <button class="primary-btn" id="sendMagicLinkButton" type="button" onclick="sendMagicLink()">发送 Magic Link 登录邮件</button>
+              <button class="primary-btn" id="sendOtpButton" type="button" onclick="sendEmailOtp()" hidden>发送验证码</button>
               <button class="plain-btn" type="button" onclick="logoutUser()">退出登录</button>
             </div>
             <div class="otp-verify-panel" id="otpVerifyPanel" hidden>
@@ -989,7 +990,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
                 <button class="plain-btn" id="resendOtpButton" type="button" onclick="resendEmailOtp()" disabled>重新发送验证码</button>
               </div>
             </div>
-            <div class="status" id="authStatus">输入邮箱后发送验证码；新邮箱会自动创建账号。当前不使用邮箱密码或邮件跳转链接。</div>
+            <div class="status" id="authStatus">当前发布模式使用 Magic Link 登录。新邮箱可通过邮件链接完成登录或注册。</div>
           </div>
         </section>
 
@@ -1122,7 +1123,9 @@ const ANALYTICS_CONFIG = {
 const SUPABASE_AUTH_CONFIG = {
   SUPABASE_URL: 'https://cesppeysiuvdwfcronmq.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_2IfCKNP3pmJla2g4fAF18A_16j_A1Lm',
-  ENABLE_SUPABASE_AUTH: true
+  ENABLE_SUPABASE_AUTH: true,
+  // 唯一登录模式来源：正式发布固定使用 Magic Link；SMTP 验收后才可改为 email_otp。
+  LOGIN_MODE: 'magic_link'
 };
 
 const RELEASE_CONFIG = Object.freeze({
@@ -1197,6 +1200,7 @@ const siteFeedbackContact = $('siteFeedbackContact');
 const aiModeStatus = $('aiModeStatus');
 const platformAiAccessStatus = $('platformAiAccessStatus');
 const loginEmailInput = $('loginEmailInput');
+const sendMagicLinkButton = $('sendMagicLinkButton');
 const sendOtpButton = $('sendOtpButton');
 const otpVerifyPanel = $('otpVerifyPanel');
 const otpEmailHint = $('otpEmailHint');
@@ -1667,6 +1671,15 @@ function authConfigured() {
     SUPABASE_AUTH_CONFIG.SUPABASE_ANON_KEY
   );
 }
+function getLoginMode() {
+  return SUPABASE_AUTH_CONFIG.LOGIN_MODE === 'email_otp' ? 'email_otp' : 'magic_link';
+}
+function isMagicLinkLoginMode() {
+  return getLoginMode() === 'magic_link';
+}
+function isOtpLoginMode() {
+  return getLoginMode() === 'email_otp';
+}
 function platformWorkerConfigured() {
   return Boolean(
     PLATFORM_AI_CONFIG.PLATFORM_WORKER_BASE_URL &&
@@ -1723,7 +1736,7 @@ function loadSupabaseSdk() {
 function openLoginPanel() {
   trackEvent('login_opened', { metadata: authEventMetadata('login_panel') });
   $('accountPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  (otpLoginState.stage === 'verify' ? otpCodeInput : loginEmailInput)?.focus();
+  (isOtpLoginMode() && otpLoginState.stage === 'verify' ? otpCodeInput : loginEmailInput)?.focus();
   if (!authConfigured() && authStatus) {
     authStatus.textContent = '登录功能尚未配置。当前可继续使用本地演示模式。';
     authStatus.className = 'status';
@@ -1735,20 +1748,30 @@ function goToLoginPanel() {
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
+function getMagicLinkRedirectTo() {
+  const url = new URL(window.location.href);
+  if (!/^https?:$/.test(url.protocol)) return '';
+  url.search = '';
+  url.hash = '';
+  return url.toString();
+}
 function clearOtpResendTimer() {
   if (otpLoginState.timerId) window.clearInterval(otpLoginState.timerId);
   otpLoginState.timerId = null;
   otpLoginState.resendRemaining = 0;
 }
 function updateOtpLoginUi() {
-  const isVerifyStage = otpLoginState.stage === 'verify';
+  const otpEnabled = isOtpLoginMode();
+  const isVerifyStage = otpEnabled && otpLoginState.stage === 'verify';
+  if (sendMagicLinkButton) sendMagicLinkButton.hidden = !isMagicLinkLoginMode();
   if (otpVerifyPanel) otpVerifyPanel.hidden = !isVerifyStage;
   if (otpEmailHint) otpEmailHint.textContent = otpLoginState.email
     ? `验证码已发送至 ${maskEmail(otpLoginState.email)}。请按邮件显示的位数输入。`
     : '';
-  if (loginEmailInput) loginEmailInput.disabled = isVerifyStage || otpLoginState.isSending;
+  if (loginEmailInput) loginEmailInput.disabled = isVerifyStage || (otpEnabled && otpLoginState.isSending);
   if (sendOtpButton) {
-    sendOtpButton.disabled = otpLoginState.isSending || isVerifyStage;
+    sendOtpButton.hidden = !otpEnabled;
+    sendOtpButton.disabled = !otpEnabled || otpLoginState.isSending || isVerifyStage;
     sendOtpButton.textContent = otpLoginState.isSending ? '发送中…' : '发送验证码';
   }
   if (verifyOtpButton) {
@@ -1757,7 +1780,7 @@ function updateOtpLoginUi() {
   }
   if (changeOtpEmailButton) changeOtpEmailButton.disabled = otpLoginState.isVerifying;
   if (resendOtpButton) {
-    resendOtpButton.disabled = otpLoginState.isSending || otpLoginState.isVerifying || otpLoginState.resendRemaining > 0;
+    resendOtpButton.disabled = !otpEnabled || otpLoginState.isSending || otpLoginState.isVerifying || otpLoginState.resendRemaining > 0;
     resendOtpButton.textContent = otpLoginState.resendRemaining > 0
       ? `重新发送（${otpLoginState.resendRemaining}秒）`
       : '重新发送验证码';
@@ -1800,8 +1823,58 @@ function authErrorMessage(err, fallback) {
   if (/network|fetch|offline|timeout/.test(detail)) return '网络异常，请检查网络后重试。';
   return fallback;
 }
+async function sendMagicLink() {
+  openLoginPanel();
+  if (!isMagicLinkLoginMode()) {
+    setAuthMessage('当前登录模式为邮箱验证码，请使用验证码登录。', 'error');
+    return;
+  }
+  const email = loginEmailInput?.value.trim() || '';
+  if (!authConfigured()) {
+    trackEvent('login_failed', { metadata: authEventMetadata('auth_not_configured') });
+    setAuthMessage('登录功能尚未配置。当前可继续使用本地演示模式。', 'error');
+    return;
+  }
+  if (!isValidEmail(email)) {
+    trackEvent('login_failed', { metadata: authEventMetadata('invalid_email') });
+    setAuthMessage('请填写有效邮箱，再发送登录邮件。', 'error');
+    return;
+  }
+  const redirectTo = getMagicLinkRedirectTo();
+  if (!redirectTo) {
+    setAuthMessage('请通过本地服务器或公开站点打开页面后再发送登录邮件。', 'error');
+    return;
+  }
+  if (sendMagicLinkButton?.disabled) return;
+  if (sendMagicLinkButton) {
+    sendMagicLinkButton.disabled = true;
+    sendMagicLinkButton.textContent = '发送中…';
+  }
+  try {
+    const client = await getSupabaseAuthClient();
+    const { error } = await client.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo }
+    });
+    if (error) throw error;
+    setAuthMessage(`Magic Link 登录邮件已发送到 ${maskEmail(email)}，请在邮箱中打开链接完成登录。`, 'success');
+    trackEvent('magic_link_sent', { metadata: authEventMetadata('magic_link_send') });
+  } catch (err) {
+    trackEvent('login_failed', { metadata: authEventMetadata('magic_link_send') });
+    setAuthMessage(authErrorMessage(err, '登录邮件发送失败，请稍后重试。'), 'error');
+  } finally {
+    if (sendMagicLinkButton) {
+      sendMagicLinkButton.disabled = false;
+      sendMagicLinkButton.textContent = '发送 Magic Link 登录邮件';
+    }
+  }
+}
 async function sendEmailOtp({ isResend = false } = {}) {
   openLoginPanel();
+  if (!isOtpLoginMode()) {
+    setAuthMessage('当前发布模式使用 Magic Link 登录。', 'error');
+    return;
+  }
   const email = (isResend ? otpLoginState.email : loginEmailInput?.value.trim()) || '';
   if (!authConfigured()) {
     trackEvent('login_failed', { metadata: authEventMetadata('auth_not_configured') });
@@ -1841,6 +1914,10 @@ function resendEmailOtp() {
   return sendEmailOtp({ isResend: true });
 }
 async function verifyEmailOtp() {
+  if (!isOtpLoginMode()) {
+    setAuthMessage('当前发布模式使用 Magic Link 登录。', 'error');
+    return;
+  }
   const email = otpLoginState.email;
   normalizeOtpCodeInput();
   const token = otpCodeInput?.value || '';
@@ -1906,9 +1983,10 @@ function renderAuthState() {
     return;
   }
   const email = currentAuthSession?.user?.email || '';
+  const loginMethod = isMagicLinkLoginMode() ? 'Magic Link' : '邮箱验证码';
   authStatus.textContent = email
     ? `已登录：${maskEmail(email)}。可选择平台 AI 或自带 API Key；平台 AI 当前仍在测试。`
-    : '未登录。仅可使用本地演示模式；登录后可选择平台 AI 或自带 API Key。';
+    : `未登录。仅可使用本地演示模式；当前使用 ${loginMethod} 登录。`;
   authStatus.className = `status ${email ? 'success' : ''}`.trim();
 }
 function syncAuthSession(session) {

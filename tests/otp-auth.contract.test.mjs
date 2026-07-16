@@ -17,7 +17,7 @@ function createNode() {
 
 function createHarness(overrides = {}) {
   const nodes = Object.fromEntries([
-    'accountPanel', 'loginEmailInput', 'sendOtpButton', 'otpVerifyPanel',
+    'accountPanel', 'loginEmailInput', 'sendMagicLinkButton', 'sendOtpButton', 'otpVerifyPanel',
     'otpEmailHint', 'otpCodeInput', 'verifyOtpButton', 'changeOtpEmailButton',
     'resendOtpButton', 'authStatus', 'platformAiAccessStatus'
   ].map((id) => [id, createNode()]));
@@ -33,8 +33,8 @@ function createHarness(overrides = {}) {
     ...overrides.auth
   };
   const api = new Function('deps', `
-    const { nodes, auth, events, intervals } = deps;
-    const SUPABASE_AUTH_CONFIG = { ENABLE_SUPABASE_AUTH: true, SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_mock' };
+    const { nodes, auth, events, intervals, loginMode } = deps;
+    const SUPABASE_AUTH_CONFIG = { ENABLE_SUPABASE_AUTH: true, SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: 'sb_publishable_mock', LOGIN_MODE: loginMode || 'email_otp' };
     const PLATFORM_AI_CONFIG = { ENABLE_PLATFORM_AI: false, PLATFORM_WORKER_BASE_URL: '', PLATFORM_ANALYZE_PATH: '' };
     const OTP_RESEND_SECONDS = 60;
     const otpLoginState = { email: '', stage: 'email', resendRemaining: 0, timerId: null, isSending: false, isVerifying: false };
@@ -43,6 +43,7 @@ function createHarness(overrides = {}) {
     let gateRenderCount = 0;
     const $ = (id) => nodes[id] || null;
     const loginEmailInput = $('loginEmailInput');
+    const sendMagicLinkButton = $('sendMagicLinkButton');
     const sendOtpButton = $('sendOtpButton');
     const otpVerifyPanel = $('otpVerifyPanel');
     const otpEmailHint = $('otpEmailHint');
@@ -53,6 +54,7 @@ function createHarness(overrides = {}) {
     const authStatus = $('authStatus');
     const platformAiAccessStatus = $('platformAiAccessStatus');
     const window = {
+      location: { href: 'http://localhost:4178/index.html?preview=1#session' },
       setInterval(callback) { const id = intervals.size + 1; intervals.set(id, callback); return id; },
       clearInterval(id) { intervals.delete(id); },
       addEventListener() {}
@@ -68,7 +70,7 @@ function createHarness(overrides = {}) {
       getCurrentSession: () => currentAuthSession,
       getGateRenderCount: () => gateRenderCount
     };
-  `)({ nodes, auth, events, intervals });
+  `)({ nodes, auth, events, intervals, loginMode: overrides.loginMode });
   return { ...api, auth, events };
 }
 
@@ -160,12 +162,13 @@ test('session 恢复与退出会更新页面登录门禁状态', async () => {
   assert.match(harness.nodes.authStatus.textContent, /已退出登录/);
 });
 
-test('页面静态规则保持 OTP、免费门禁和平台 AI 关闭', () => {
+test('OTP 模式静态规则保持可用、免费门禁和平台 AI 关闭', () => {
   assert.match(html, /ENABLE_PLATFORM_AI:\s*false/);
   assert.match(html, /mode !== 'mock' && !currentAuthSession/);
+  assert.match(html, /LOGIN_MODE:\s*'magic_link'/);
   assert.match(html, /autocomplete="one-time-code"/);
   assert.match(html, /inputmode="numeric"/);
   assert.match(html, /verifyOtp\(\{ email, token, type: 'email' \}\)/);
-  assert.doesNotMatch(html, /sendLoginLink|emailRedirectTo|Magic Link/);
+  assert.match(html, /if \(!isOtpLoginMode\(\)\)/);
   assert.doesNotMatch(html, /loginEmailInput"[^>]*type="password"/);
 });

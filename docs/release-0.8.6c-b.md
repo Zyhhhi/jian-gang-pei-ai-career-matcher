@@ -24,3 +24,7 @@
 ## 验收结论
 
 产品目标为 6 位邮箱 OTP；但本阶段未读取 Supabase 后台设置，不能确认真实项目配置的验证码长度。前端仅限制数字输入，不固定长度。`ENABLE_PLATFORM_AI = false` 保持不变。
+
+## 后续发布策略
+
+8.6C-B 的 OTP 实现保留在分支中，但当前发布默认由 `SUPABASE_AUTH_CONFIG.LOGIN_MODE = 'magic_link'` 使用既有 Magic Link。该模式动态生成当前 HTTP(S) 页面作为 `emailRedirectTo`，以兼容本地预览和 GitHub Pages；管理员需在 Supabase URL Configuration 允许正式 Pages 地址、`/index.html` 地址及实际本地预览地址。SMTP、`{{ .Token }}` 模板和真实 OTP 验收完成前，不得把模式改为 `email_otp`。

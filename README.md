@@ -7,7 +7,7 @@
 - 当前阶段：8.6C-B，邮箱 OTP 登录前端实现。
 - 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
 - 当前真实可用分析：本地规则 / Mock 分析。
-- 当前登录代码：Supabase 邮箱 OTP 的发送与验证流程已实现；真实邮件模板和真实收码登录尚待人工配置与验证。
+- 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
 - 当前自带 API Key：只支持本地保存、脱敏显示与清除；真实模型调用尚未接入。
 - 当前平台 AI：仅登录后可选择和查看规则；仍在测试，不会调用 Worker、DeepSeek 或真实后端。
 
@@ -26,15 +26,20 @@
 
 收费、支付和订单方案已取消。历史数据库中的 `platform_paid_credits` 字段暂时保留以避免破坏既有数据和 migration，但已废弃：前端不展示、不读取、不依赖该字段。
 
-## 邮箱 OTP 登录
+## 发布登录模式
 
-- 输入邮箱后，前端调用 `supabase.auth.signInWithOtp({ email })`；新邮箱允许由 Supabase 自动创建账号。
-- 收到邮件验证码后，前端调用 `supabase.auth.verifyOtp({ email, token, type: 'email' })` 建立 session。
-- 页面提供数字验证码输入、粘贴支持、60 秒重发倒计时、更换邮箱、错误中文提示、session 恢复和退出登录。
-- 前端没有邮箱密码字段，也不传 `emailRedirectTo`，不再要求用户点击邮件链接返回页面。
-- 产品目标为 6 位验证码；由于本阶段未读取 Supabase 后台配置，前端不强制固定长度，兼容邮件实际发出的数字验证码长度。
+- `SUPABASE_AUTH_CONFIG.LOGIN_MODE` 是唯一登录模式来源，当前固定为 `magic_link`。
+- `magic_link`：前端调用 `signInWithOtp({ email, options: { emailRedirectTo } })`；`emailRedirectTo` 由当前 HTTP(S) 页面地址动态生成，保留页面路径、移除 query/hash，因此兼容本地静态服务器与 GitHub Pages。
+- `email_otp`：保留现有 `signInWithOtp({ email })`、`verifyOtp({ email, token, type: 'email' })`、数字输入、60 秒重发和错误处理；当前默认隐藏，不能由普通用户触发。
+- 两种模式均复用 session 恢复、退出和未登录仅 Mock 门禁；没有邮箱密码字段。
 
-在真实收码测试前，必须先完成 [Supabase 邮箱 OTP 人工配置](docs/supabase-email-otp-setup.md)。该文档只是操作说明，不代表后台已经配置完成。
+Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要包含：
+
+- Site URL：`https://zyhhhi.github.io/jian-gang-pei-ai-career-matcher/`
+- Redirect URLs：`https://zyhhhi.github.io/jian-gang-pei-ai-career-matcher/`、`https://zyhhhi.github.io/jian-gang-pei-ai-career-matcher/index.html`
+- 本地预览实际使用的精确地址，例如 `http://127.0.0.1:4178/index.html` 与 `http://localhost:4178/index.html`
+
+未来启用 OTP 前，必须先完成 [Supabase 邮箱 OTP 人工配置](docs/supabase-email-otp-setup.md) 并做真实收码验收。该文档只是操作说明，不代表后台已经配置完成。
 
 ## 本地数据与隐私
 
@@ -56,7 +61,7 @@
 
 ## 文件说明
 
-- `index.html`：静态前端、模式权限门禁、邮箱 OTP 登录入口和本地 Mock 分析。
+- `index.html`：静态前端、模式权限门禁、双模式登录开关与本地 Mock 分析。
 - `worker/index.js`：平台 AI Worker 安全实现；当前前端开关关闭。
 - `docs/product-plan-free-v1.md`：免费产品正式方案与未完成项。
 - `docs/release-0.8.6c-a.md`：8.6C-A 页面和规则重置记录。
@@ -78,6 +83,12 @@ OTP Mock 契约测试：
 
 ```powershell
 node --test tests/otp-auth.contract.test.mjs
+```
+
+默认 Magic Link 模式契约测试：
+
+```powershell
+node --test tests/login-mode.contract.test.mjs
 ```
 
 不要在本地检查中连接真实 Supabase、调用真实 DeepSeek、执行 migration 或部署 Worker。

@@ -34,11 +34,11 @@
 
 ## 登录路线
 
-目标方案为邮箱 6 位验证码 OTP，登录与注册合并，不使用邮箱密码。
+产品目标仍为邮箱 6 位验证码 OTP，登录与注册合并，不使用邮箱密码；但 OTP 不是当前上线必要条件。
 
-8.6C-B 已实现前端发送与验证流程：`signInWithOtp({ email })` 发送邮件，`verifyOtp({ email, token, type: 'email' })` 建立 session。页面不传 `emailRedirectTo`、不要求邮件跳转、提供数字验证码输入、60 秒重发倒计时、更换邮箱、session 恢复和退出后的权限锁定。
+当前发布策略由 `SUPABASE_AUTH_CONFIG.LOGIN_MODE` 唯一控制，默认 `magic_link`。该模式使用 `signInWithOtp({ email, options: { emailRedirectTo } })`，并根据当前 HTTP(S) 页面动态生成 redirect，不硬编码本地路径。Supabase URL Configuration 必须允许 GitHub Pages 正式地址、其 `/index.html` 地址，以及实际使用的本地预览地址。
 
-Supabase 官方产品文档将邮箱 OTP 描述为 6 位，但本阶段没有读取真实项目后台的模板和 OTP 配置；因此前端不固定验证码长度，只接受数字。真实邮件模板配置、真实收码、验证登录和 session 恢复仍待人工完成与验证，操作见 `docs/supabase-email-otp-setup.md`。
+8.6C-B 的 OTP 实现完整保留：`email_otp` 模式调用 `signInWithOtp({ email })` 和 `verifyOtp({ email, token, type: 'email' })`，包含数字输入、60 秒重发、session 恢复和退出锁定。默认 Magic Link 模式不展示也不允许普通用户触发 OTP。未来只有完成 SMTP 模板、真实收码与 session 验收后才可切换。
 
 ## 收费方案处置
 
