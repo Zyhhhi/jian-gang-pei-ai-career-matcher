@@ -332,10 +332,26 @@ a { color: inherit; }
   transition: border-color .18s ease, background .18s ease, transform .18s ease;
 }
 .ai-mode-card:hover { transform: translateY(-1px); border-color: var(--line-strong); }
-.ai-mode-card.active {
-  border-color: rgba(8,127,91,.45);
-  background: var(--green-soft);
-}
+  .ai-mode-card.active {
+    border-color: rgba(8,127,91,.45);
+    background: var(--green-soft);
+  }
+  .ai-mode-card.locked {
+    cursor: pointer;
+    border-style: dashed;
+    color: var(--muted);
+    background: rgba(245,245,247,.82);
+  }
+  .ai-mode-card.locked::after {
+    content: '登录后可用';
+    display: inline-block;
+    margin-top: 8px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(29,29,31,.08);
+    color: var(--muted);
+    font-size: 12px;
+  }
 .ai-mode-card strong { display: block; color: var(--ink); margin-bottom: 6px; }
 .ai-mode-card span { display: block; font-size: 13px; }
 .mode-detail {
@@ -890,28 +906,28 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 
         <section class="job-method" id="aiModePanel">
           <h3>AI 模式</h3>
-          <p class="hint">选择本次生成求职分析包的模式。当前版本只有本地演示模式真正执行分析，自带 Key 和平台 AI 尚未开放真实模型调用。</p>
+          <p class="hint">未登录仅可使用本地演示模式。本模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。</p>
           <div class="ai-mode-grid">
             <button class="ai-mode-card" id="modeCardMock" type="button" onclick="selectAiMode('mock')">
               <strong>本地演示模式</strong>
-              <span>当前使用本地规则 / Mock 分析，适合体验流程，不消耗 API 额度。</span>
+              <span>本模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。</span>
             </button>
             <button class="ai-mode-card" id="modeCardOwnApi" type="button" onclick="selectAiMode('own_api')">
               <strong>自带 API Key 模式</strong>
-              <span>API Key 仅保存在本地；当前版本尚未启用真实自带 Key 调用。</span>
+              <span>登录后可选择；Key 仅保存在当前浏览器，真实调用仍待接入。</span>
             </button>
             <button class="ai-mode-card" id="modeCardPlatformApi" type="button" onclick="selectAiMode('platform_api')">
               <strong>平台 AI 模式</strong>
-              <span>安全与额度闭环测试中，当前暂未开放，不调用平台模型或扣减额度。</span>
+              <span>登录后可选择；每日最多 5 次、每月最多 30 次，当前仍在测试。</span>
             </button>
           </div>
           <div class="mode-detail" id="modeDetailMock">
             <strong>当前模式：本地演示模式</strong>
-            <p class="hint">不需要登录，不需要 API Key。系统会继续使用当前已有的本地规则 / Mock 分析生成完整求职包。</p>
+            <p class="hint">不需要登录，不需要 API Key。本模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。</p>
           </div>
           <div class="mode-detail" id="modeDetailOwnApi">
             <strong>当前模式：自带 API Key 模式</strong>
-            <p class="hint">API Key 仅保存在当前浏览器本地，不上传服务器、不写入 Supabase、不写入 URL。当前版本尚未启用真实自带 Key 调用，保存 Key 后仍只生成本地演示分析。</p>
+            <p class="hint">仅登录后可用。API Key 默认只保存在当前浏览器本地，不上传 Supabase、不写入 URL；当前真实调用待接入，不会伪装为已可用。</p>
             <section id="apiKeyPanel">
               <div class="field">
                 <label for="apiKeyInput">API Key</label>
@@ -927,43 +943,35 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
           </div>
           <div class="mode-detail" id="modeDetailPlatformApi">
             <strong>当前模式：平台 AI 模式</strong>
-            <p class="hint">平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型、不会创建订单，也不会扣减额度。</p>
+            <p class="hint">仅登录后可用。平台 AI 目标规则为成功分析才计次，每日最多 5 次、每月最多 30 次；当前仍在测试，页面不会调用平台模型。</p>
             <ul class="mode-rules">
-              <li>登录后赠送 3 次免费额度。</li>
-              <li>免费次数用完后，5 元购买 15 次完整求职分析额度。</li>
-              <li>每 1 次额度可生成 1 份完整求职分析包。</li>
+              <li>每日最多 5 次。</li>
+              <li>每月最多 30 次。</li>
+              <li>仅成功分析计次；失败不计次。</li>
             </ul>
-            <div class="status error" id="platformAiAccessStatus">平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。</div>
+            <div class="status error" id="platformAiAccessStatus">登录后可查看平台 AI 使用规则。当前仍在测试，不会调用平台模型。</div>
             <div class="ops">
               <button class="secondary-btn" type="button" onclick="goToLoginPanel()">去登录</button>
-              <button class="secondary-btn" type="button" onclick="showPlatformAiRules()">查看平台 AI 额度规则</button>
             </div>
           </div>
           <div class="status" id="aiModeStatus">当前模式：本地演示模式。</div>
         </section>
 
         <section class="job-method" id="accountPanel">
-          <h3>账号登录与平台额度</h3>
-          <p class="hint">登录后可查看预留的平台额度信息。平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度；本地演示模式不强制登录。</p>
+          <h3>账号登录与使用规则</h3>
+          <p class="hint">未登录可继续使用本地演示。登录后可选择平台 AI 或自带 API Key；平台 AI 当前仍在测试，真实调用尚未开放。</p>
           <div class="auth-box">
             <div class="field">
               <label for="loginEmailInput">邮箱登录</label>
-              <input id="loginEmailInput" type="email" autocomplete="email" placeholder="输入邮箱，发送 Magic Link / 邮箱验证码">
+              <input id="loginEmailInput" type="email" autocomplete="email" placeholder="输入邮箱，发送登录邮件（当前为 Magic Link）">
             </div>
             <div class="auth-actions">
               <button class="secondary-btn" type="button" onclick="openLoginPanel()">打开登录区域</button>
-              <button class="primary-btn" type="button" onclick="sendLoginLink()">发送登录邮件</button>
+              <button class="primary-btn" type="button" onclick="sendLoginLink()">发送 Magic Link 登录邮件</button>
               <button class="plain-btn" type="button" onclick="logoutUser()">退出登录</button>
             </div>
-            <div class="status" id="authStatus">登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。</div>
+            <div class="status" id="authStatus">当前实际登录方式为 Magic Link。邮箱 6 位验证码 OTP 为目标方案，尚未实现。</div>
           </div>
-          <div class="quota-summary" id="quotaSummary">
-            <div class="quota-pill"><strong>3</strong><span>免费总次数</span></div>
-            <div class="quota-pill"><strong>0</strong><span>已使用免费次数</span></div>
-            <div class="quota-pill"><strong>3</strong><span>剩余免费次数</span></div>
-            <div class="quota-pill"><strong>0</strong><span>付费剩余额度</span></div>
-          </div>
-          <div class="status" id="quotaStatus">平台 AI 尚未正式开放；登录后仅展示预留额度信息，当前不会调用平台模型或扣减额度。</div>
         </section>
 
         <div class="ops">
@@ -1099,9 +1107,9 @@ const SUPABASE_AUTH_CONFIG = {
 };
 
 const RELEASE_CONFIG = Object.freeze({
-  VERSION: 'v0.8.6-beta',
-  MODE_SUMMARY: '本地演示开放；自带 Key 与平台 AI 暂未开放真实调用',
-  UPDATED_AT: '2026-07-14'
+  VERSION: 'v0.8.6c-a-local',
+  MODE_SUMMARY: '未登录仅可使用本地演示；登录后可选择平台 AI 或自带 Key（当前均未开放真实调用）',
+  UPDATED_AT: '2026-07-16'
 });
 
 const PLATFORM_AI_CONFIG = {
@@ -1130,7 +1138,6 @@ let hasTrackedStartAnalysis = false;
 let lastJdTrackAt = 0;
 let supabaseAuthClient = null;
 let currentAuthSession = null;
-let currentQuota = null;
 
 const $ = (id) => document.getElementById(id);
 const resumeInput = $('resumeInput');
@@ -1163,8 +1170,6 @@ const aiModeStatus = $('aiModeStatus');
 const platformAiAccessStatus = $('platformAiAccessStatus');
 const loginEmailInput = $('loginEmailInput');
 const authStatus = $('authStatus');
-const quotaStatus = $('quotaStatus');
-const quotaSummary = $('quotaSummary');
 const JOB_MANUAL_FIELDS = [
   ['companyName', 'jobCompanyName', '公司名'],
   ['jobTitle', 'jobTitle', '岗位名'],
@@ -1391,7 +1396,7 @@ const exampleCases = [
 教育背景：统计学本科，学习过概率论、数理统计、回归分析、Python 和 SQL 基础。
 
 项目经历：
-1. 电商转化分析：分析浏览、加购、下单、支付漏斗，提出页面和活动优化建议。
+1. 用户行为分析：梳理访问、意向与留存路径，提出页面和活动优化建议。
 2. 用户留存分析：用 cohort 方法观察新用户留存变化，定位流失节点。
 3. 招聘 JD 分析：整理不同岗位关键词，分析能力要求差异。
 
@@ -1519,6 +1524,14 @@ function getAiMode() {
 }
 function selectAiMode(mode, source = 'mode_switch') {
   if (!['mock', 'own_api', 'platform_api'].includes(mode)) return;
+  if (mode !== 'mock' && !currentAuthSession) {
+    localStorage.setItem(STORAGE.aiMode, 'mock');
+    renderAiModeState();
+    renderLocalDataStatus();
+    openLoginPanel();
+    setStatus('登录后可选择平台 AI 或自带 API Key。本模式仅用于体验产品流程，当前请使用本地演示模式。', 'error');
+    return;
+  }
   localStorage.setItem(STORAGE.aiMode, mode);
   renderAiModeState();
   renderLocalDataStatus();
@@ -1536,7 +1549,12 @@ function selectAiMode(mode, source = 'mode_switch') {
   });
 }
 function renderAiModeState() {
-  const mode = getAiMode();
+  const hasSession = Boolean(currentAuthSession);
+  let mode = getAiMode();
+  if (mode !== 'mock' && !hasSession) {
+    mode = 'mock';
+    localStorage.setItem(STORAGE.aiMode, mode);
+  }
   const cards = {
     mock: $('modeCardMock'),
     own_api: $('modeCardOwnApi'),
@@ -1549,26 +1567,29 @@ function renderAiModeState() {
   };
   Object.entries(cards).forEach(([key, el]) => {
     if (!el) return;
+    const locked = key !== 'mock' && !hasSession;
     el.classList.toggle('active', key === mode);
+    el.classList.toggle('locked', locked);
     el.setAttribute('aria-pressed', key === mode ? 'true' : 'false');
+    el.setAttribute('aria-disabled', locked ? 'true' : 'false');
   });
   Object.entries(details).forEach(([key, el]) => {
     if (el) el.classList.toggle('visible', key === mode);
   });
   if (aiModeStatus) {
     const statusText = {
-      mock: '当前模式：本地演示模式。将使用本地规则 / Mock 分析，不消耗 API。',
+      mock: '当前模式：本地演示模式。本模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。',
       own_api: getUserApiKey()
-        ? `当前模式：自带 API Key 模式。已保存 ${maskApiKey(getUserApiKey())}，当前版本尚未启用真实自带 Key 调用，本次仍生成本地演示分析。`
-        : '当前模式：自带 API Key 模式。当前版本尚未启用真实调用；如需体验流程，请切换到本地演示模式。',
+        ? `当前模式：自带 API Key 模式。已保存 ${maskApiKey(getUserApiKey())}，但真实调用仍待接入。`
+        : '当前模式：自带 API Key 模式。可在本地保存并清除 Key，真实调用仍待接入。',
       platform_api: !PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI
-        ? '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。'
+        ? '当前模式：平台 AI 模式。每日最多 5 次、每月最多 30 次；当前仍在测试，不会调用平台模型。'
         : platformWorkerConfigured()
-          ? '当前模式：平台 AI 模式。已配置 Worker，分析时将由 Worker 校验登录、额度和限流后调用平台 AI。'
+          ? '当前模式：平台 AI 模式。成功分析才计次，同时受每日 5 次和每月 30 次约束。'
           : '当前模式：平台 AI 模式。后端 Worker 尚未配置，当前不会调用平台模型。'
     };
     aiModeStatus.textContent = statusText[mode];
-    const unavailable = (mode === 'own_api' && !getUserApiKey()) ||
+    const unavailable = mode === 'own_api' ||
       (mode === 'platform_api' && !PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI);
     aiModeStatus.className = `status ${unavailable ? 'error' : ''}`.trim();
   }
@@ -1619,7 +1640,7 @@ function platformWorkerConfigured() {
 }
 async function initAuthModule() {
   renderAuthState();
-  renderQuotaState();
+  renderAiModeState();
   renderPlatformAiAccessState();
   if (!authConfigured()) return;
   try {
@@ -1628,23 +1649,20 @@ async function initAuthModule() {
     const { data } = await client.auth.getSession();
     currentAuthSession = data?.session || null;
     renderAuthState();
-    if (currentAuthSession) await loadUserQuota('session_restore');
+    renderAiModeState();
+    renderPlatformAiAccessState();
     client.auth.onAuthStateChange(async (event, session) => {
       currentAuthSession = session || null;
       renderAuthState();
+      renderAiModeState();
+      renderPlatformAiAccessState();
       if (event === 'SIGNED_IN' && session) {
         trackEvent('login_success', { metadata: authEventMetadata('auth_state') });
-        await loadUserQuota('login_success');
-      }
-      if (event === 'SIGNED_OUT') {
-        currentQuota = null;
-        renderQuotaState();
-        renderPlatformAiAccessState();
       }
     });
   } catch (err) {
     if (authStatus) {
-      authStatus.textContent = `登录模块初始化失败：${err.message || '未知错误'}。当前可继续使用本地演示模式或自带 API Key 模式。`;
+      authStatus.textContent = `登录模块初始化失败：${err.message || '未知错误'}。当前可继续使用本地演示模式。`;
       authStatus.className = 'status error';
     }
   }
@@ -1676,7 +1694,7 @@ function openLoginPanel() {
   $('accountPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   loginEmailInput?.focus();
   if (!authConfigured() && authStatus) {
-    authStatus.textContent = '登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。';
+    authStatus.textContent = '登录功能尚未配置。当前可继续使用本地演示模式。';
     authStatus.className = 'status';
   }
 }
@@ -1688,7 +1706,7 @@ async function sendLoginLink() {
   const email = loginEmailInput?.value.trim() || '';
   if (!authConfigured()) {
     trackEvent('login_failed', { metadata: authEventMetadata('auth_not_configured') });
-    setAuthMessage('登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。', 'error');
+    setAuthMessage('登录功能尚未配置。当前可继续使用本地演示模式。', 'error');
     return;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1703,7 +1721,7 @@ async function sendLoginLink() {
       options: { emailRedirectTo: window.location.href.split('#')[0] }
     });
     if (error) throw error;
-    setAuthMessage(`登录邮件已发送到 ${maskEmail(email)}，请在邮箱中确认。`, 'success');
+    setAuthMessage(`Magic Link 登录邮件已发送到 ${maskEmail(email)}，请在邮箱中确认。`, 'success');
   } catch (err) {
     trackEvent('login_failed', { metadata: authEventMetadata('send_magic_link') });
     setAuthMessage(`登录邮件发送失败：${err.message || '未知错误'}`, 'error');
@@ -1719,9 +1737,8 @@ async function logoutUser() {
     const { error } = await client.auth.signOut();
     if (error) throw error;
     currentAuthSession = null;
-    currentQuota = null;
     renderAuthState();
-    renderQuotaState();
+    renderAiModeState();
     renderPlatformAiAccessState();
     trackEvent('logout_success', { metadata: authEventMetadata('logout') });
     setAuthMessage('已退出登录。', 'success');
@@ -1737,131 +1754,30 @@ function setAuthMessage(text, type = '') {
 function renderAuthState() {
   if (!authStatus) return;
   if (!authConfigured()) {
-    authStatus.textContent = '登录功能尚未配置时仍可使用本地演示模式；自带 Key 与平台 AI 当前均未开放真实调用。';
+    authStatus.textContent = '登录功能尚未配置。当前可继续使用本地演示模式。';
     authStatus.className = 'status';
     return;
   }
   const email = currentAuthSession?.user?.email || '';
   authStatus.textContent = email
-    ? `已登录：${maskEmail(email)}。额度信息从 Supabase user_quota 读取；平台 AI 尚未正式开放。`
-    : '未登录。登录后可查看预留额度信息；平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度。';
+    ? `已登录：${maskEmail(email)}。可选择平台 AI 或自带 API Key；平台 AI 当前仍在测试。`
+    : '未登录。仅可使用本地演示模式；登录后可选择平台 AI 或自带 API Key。';
   authStatus.className = `status ${email ? 'success' : ''}`.trim();
-}
-async function loadUserQuota(source = 'quota_view') {
-  if (!authConfigured() || !currentAuthSession?.user?.id) {
-    currentQuota = null;
-    renderQuotaState();
-    renderPlatformAiAccessState();
-    return null;
-  }
-  try {
-    const client = await getSupabaseAuthClient();
-    const userId = currentAuthSession.user.id;
-    const { data, error } = await client
-      .from('user_quota')
-      .select('user_id, platform_free_total, platform_free_used, platform_paid_credits, created_at, updated_at')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (error) throw error;
-    if (data) {
-      currentQuota = normalizeQuota(data);
-      renderQuotaState();
-      renderPlatformAiAccessState();
-      trackEvent('quota_loaded', { metadata: quotaEventMetadata(source) });
-      return currentQuota;
-    }
-    return await initializeUserQuota(source);
-  } catch (err) {
-    currentQuota = null;
-    renderQuotaState(`额度读取失败：${err.message || '未知错误'}。本阶段不会扣减额度。`, 'error');
-    renderPlatformAiAccessState();
-    return null;
-  }
-}
-async function initializeUserQuota(source = 'quota_init') {
-  const userId = currentAuthSession?.user?.id;
-  if (!authConfigured() || !userId) return null;
-  try {
-    const client = await getSupabaseAuthClient();
-    const payload = {
-      user_id: userId,
-      platform_free_total: 3,
-      platform_free_used: 0,
-      platform_paid_credits: 0
-    };
-    const { data, error } = await client
-      .from('user_quota')
-      .insert(payload)
-      .select('user_id, platform_free_total, platform_free_used, platform_paid_credits, created_at, updated_at')
-      .single();
-    if (error) throw error;
-    currentQuota = normalizeQuota(data || payload);
-    renderQuotaState();
-    renderPlatformAiAccessState();
-    trackEvent('quota_initialized', { metadata: quotaEventMetadata(source) });
-    return currentQuota;
-  } catch (err) {
-    currentQuota = normalizeQuota({ platform_free_total: 3, platform_free_used: 0, platform_paid_credits: 0 });
-    renderQuotaState('额度初始化失败，请检查 Supabase RLS。当前仅展示默认规则，不会扣减额度。', 'error');
-    renderPlatformAiAccessState();
-    return currentQuota;
-  }
-}
-function normalizeQuota(quota = {}) {
-  return {
-    platform_free_total: Number(quota.platform_free_total ?? 3),
-    platform_free_used: Number(quota.platform_free_used ?? 0),
-    platform_paid_credits: Number(quota.platform_paid_credits ?? 0)
-  };
-}
-function getQuotaSnapshot() {
-  const quota = normalizeQuota(currentQuota || {});
-  const freeRemaining = Math.max(0, quota.platform_free_total - quota.platform_free_used);
-  return { ...quota, freeRemaining };
-}
-function renderQuotaState(message = '', type = '') {
-  const quota = getQuotaSnapshot();
-  if (quotaSummary) {
-    quotaSummary.innerHTML = `
-      <div class="quota-pill"><strong>${quota.platform_free_total}</strong><span>免费总次数</span></div>
-      <div class="quota-pill"><strong>${quota.platform_free_used}</strong><span>已使用免费次数</span></div>
-      <div class="quota-pill"><strong>${quota.freeRemaining}</strong><span>剩余免费次数</span></div>
-      <div class="quota-pill"><strong>${quota.platform_paid_credits}</strong><span>付费剩余额度</span></div>
-    `;
-  }
-  if (!quotaStatus) return;
-  if (message) {
-    quotaStatus.textContent = message;
-    quotaStatus.className = `status ${type}`.trim();
-    return;
-  }
-  if (!authConfigured()) {
-    quotaStatus.textContent = 'Supabase Auth 未配置时，额度仅展示产品规则，不读取数据库。';
-    quotaStatus.className = 'status';
-    return;
-  }
-  if (!currentAuthSession) {
-    quotaStatus.textContent = '未登录。登录后可查看预留额度信息；平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度。';
-    quotaStatus.className = 'status';
-    return;
-  }
-  quotaStatus.textContent = `额度已加载：免费剩余 ${quota.freeRemaining} 次，付费剩余 ${quota.platform_paid_credits} 次。平台 AI 尚未正式开放，当前不会调用平台模型或扣减额度。`;
-  quotaStatus.className = 'status success';
 }
 function renderPlatformAiAccessState() {
   if (!platformAiAccessStatus) return;
-  if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
-    platformAiAccessStatus.textContent = '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。';
-    platformAiAccessStatus.className = 'status error';
-    return;
-  }
   if (!authConfigured()) {
-    platformAiAccessStatus.textContent = '登录功能尚未配置，平台 AI 仅展示规则。当前可继续使用本地演示模式或自带 API Key 模式。';
+    platformAiAccessStatus.textContent = '登录功能尚未配置。当前可继续使用本地演示模式。';
     platformAiAccessStatus.className = 'status';
     return;
   }
   if (!currentAuthSession) {
-    platformAiAccessStatus.textContent = '平台 AI 模式需要登录后使用。登录后可免费体验 3 次。';
+    platformAiAccessStatus.textContent = '平台 AI 模式需要登录后使用。登录后目标规则为每日最多 5 次、每月最多 30 次。';
+    platformAiAccessStatus.className = 'status error';
+    return;
+  }
+  if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
+    platformAiAccessStatus.textContent = '已登录。平台 AI 目标规则为每日最多 5 次、每月最多 30 次；当前仍在测试，不会调用平台模型。';
     platformAiAccessStatus.className = 'status error';
     return;
   }
@@ -1870,45 +1786,20 @@ function renderPlatformAiAccessState() {
     platformAiAccessStatus.className = 'status error';
     return;
   }
-  const quota = getQuotaSnapshot();
-  if (quota.freeRemaining > 0) {
-    platformAiAccessStatus.textContent = `你还有 ${quota.freeRemaining} 次免费平台 AI 体验额度。配置 Worker 后，平台 AI 会在 DeepSeek 成功返回后由后端扣减额度。`;
-    platformAiAccessStatus.className = 'status success';
-    trackEvent('platform_api_free_available', { metadata: quotaEventMetadata('mode_status') });
-    return;
-  }
-  if (quota.platform_paid_credits > 0) {
-    platformAiAccessStatus.textContent = `你还有 ${quota.platform_paid_credits} 次平台 AI 付费分析额度。配置 Worker 后，额度扣减只由后端完成。`;
-    platformAiAccessStatus.className = 'status success';
-    return;
-  }
-  platformAiAccessStatus.textContent = '免费次数已用完，后续可 5 元购买 15 次完整求职分析额度。';
-  platformAiAccessStatus.className = 'status error';
-  trackEvent('platform_api_limit_reached', { metadata: quotaEventMetadata('mode_status') });
+  platformAiAccessStatus.textContent = '平台 AI 已配置。成功分析才计次，并同时受每日 5 次和每月 30 次约束。';
+  platformAiAccessStatus.className = 'status success';
 }
 function maskEmail(email) {
   const [name = '', domain = ''] = String(email || '').split('@');
   if (!domain) return '';
   return `${name.slice(0, 2)}****@${domain}`;
 }
-function rangeForCredits(value) {
-  const n = Number(value) || 0;
-  if (n <= 0) return '0';
-  if (n <= 3) return '1-3';
-  if (n <= 15) return '4-15';
-  return '15+';
-}
 function authEventMetadata(source) {
   return {
     aiMode: getAiMode(),
     hasSession: Boolean(currentAuthSession),
-    freeRemainingRange: rangeForCredits(getQuotaSnapshot().freeRemaining),
-    paidCreditsRange: rangeForCredits(getQuotaSnapshot().platform_paid_credits),
     source
   };
-}
-function quotaEventMetadata(source) {
-  return authEventMetadata(source);
 }
 function confirmAction(message) {
   return window.confirm(message);
@@ -2041,7 +1932,6 @@ function renderAnalyticsDashboard() {
     ['完整求职包生成次数', count('generate_job_package')],
     ['求职记录保存次数', count('save_job_record')],
     ['API Key 保存次数', count('api_key_saved')],
-    ['平台 API 付费点击次数', count('click_platform_api_payment')],
     ['用户反馈条数', feedbackCount]
   ];
   analyticsDashboard.innerHTML = items.map(([label, value]) => `
@@ -2057,24 +1947,6 @@ function trackPlatformApiMode() {
   trackEvent('switch_to_platform_api', {
     metadata: { aiMode: 'platform_api', hasApiKey: Boolean(getUserApiKey()), source: 'settings' }
   });
-}
-function trackPlatformPaymentClick() {
-  trackEvent('click_platform_api_payment', {
-    metadata: quotaEventMetadata('payment_placeholder')
-  });
-  setStatus('平台 AI 尚未正式开放。当前不会调用平台模型、不会扣减额度，也不会创建订单。', 'success');
-}
-function showPlatformAiRules() {
-  selectAiMode('platform_api', 'payment_placeholder');
-  trackEvent('platform_api_quota_viewed', { metadata: quotaEventMetadata('payment_placeholder') });
-  trackPlatformPaymentClick();
-  const message = [
-    '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。',
-    '当前不会调用平台模型、不会扣减额度，也不会创建订单。',
-    '自带 API Key 模式当前也尚未启用真实调用，可切换到本地演示模式体验流程。',
-    '平台 AI 未来价格：5 元 / 15 次完整求职分析包。'
-  ].join('\n');
-  window.alert(message);
 }
 function createEmptyJobDraft() {
   const now = new Date().toLocaleString();
@@ -2853,23 +2725,28 @@ function validateInput() {
 }
 function validateAiModeForAnalysis() {
   const mode = getAiMode();
-  if (mode === 'own_api' && !getUserApiKey()) return '请先保存自带 API Key，或切换到本地演示模式。';
+  if (mode !== 'mock' && !currentAuthSession) {
+    trackEvent('platform_api_requires_login', { metadata: authEventMetadata('analysis_click') });
+    return '未登录只能使用本地演示模式。请先登录后再选择平台 AI 或自带 API Key。';
+  }
+  if (mode === 'own_api') {
+    return '自带 API Key 的真实调用仍待接入。Key 只保存在当前浏览器，不会自动回退并伪装成真实分析。请切换到本地演示模式。';
+  }
   if (mode === 'platform_api') {
+    if (!currentAuthSession) {
+      return '平台 AI 模式需要登录后使用。';
+    }
     if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
-      return '平台 AI 正在进行安全与额度闭环测试，当前暂未开放。当前不会调用平台模型或扣减额度。请切换到本地演示模式。';
+      return '平台 AI 目标规则为每日最多 5 次、每月最多 30 次；当前仍在测试，不会调用平台模型。请切换到本地演示模式。';
     }
     const resumeLength = getResumeProfile()?.resumeText?.length || 0;
     if (resumeLength > RESUME_IMPORT_CONFIG.PLATFORM_RESUME_CHAR_LIMIT) {
       return `当前简历正文共 ${resumeLength} 字，平台 AI 单次最多处理 ${RESUME_IMPORT_CONFIG.PLATFORM_RESUME_CHAR_LIMIT} 字。请先精简简历档案后再分析，系统不会自动截断。`;
     }
   }
-  if (mode === 'platform_api' && !currentAuthSession) {
-    trackEvent('platform_api_requires_login', { metadata: quotaEventMetadata('analysis_click') });
-    return '平台 AI 模式需要登录后使用。登录后可免费体验 3 次。当前可先使用本地演示模式或自带 API Key 模式。';
-  }
   if (mode === 'platform_api') {
     if (!platformWorkerConfigured()) return '平台 AI 后端尚未配置。当前不会调用 DeepSeek，可先使用本地演示模式生成 Mock 分析。';
-    trackEvent('platform_api_quota_viewed', { metadata: quotaEventMetadata('analysis_click') });
+    trackEvent('platform_api_quota_viewed', { metadata: authEventMetadata('analysis_click') });
   }
   return '';
 }
@@ -2922,12 +2799,8 @@ async function runAnalyze() {
     }
     return;
   }
-  const analysisReason = mode === 'own_api'
-    ? '自带 API Key 模式暂未开放真实调用，本地演示规则分析'
-    : '本地演示模式规则分析';
-  setStatus(mode === 'own_api'
-    ? '当前版本尚未启用真实自带 Key 调用，本次使用本地规则生成演示分析。'
-    : '分析中：正在基于本地规则生成完整求职分析包。');
+  const analysisReason = '本地演示模式规则分析';
+  setStatus('分析中：正在基于本地规则生成完整求职分析包。');
   try {
     setStep(0);
     await wait(450);
@@ -2952,11 +2825,9 @@ async function runAnalyze() {
         hasConfirmedJD: true
       }
     });
-    setStatus(mode === 'own_api'
-      ? '完整求职分析包已生成。当前版本尚未启用真实自带 Key 调用，本次使用本地规则生成演示分析。'
-      : '完整求职分析包已生成。本阶段使用本地规则 / Mock 分析，结果仅供求职准备参考。', 'success');
+    setStatus('完整求职分析包已生成。本模式使用本地规则 / Mock 分析，结果仅供求职准备参考。', 'success');
   } catch (err) {
-    const fallback = createMockResult(resumeText, jdText, 'API 异常后 Mock 兜底');
+    const fallback = createMockResult(resumeText, jdText, '本地演示异常后 Mock 兜底');
     currentResult = fallback;
     currentRecordId = saveHistory(fallback);
     renderResult(fallback);
@@ -3062,11 +2933,6 @@ async function runPlatformAnalyze(profile, draft, startedAt) {
   currentRecordId = saveHistory(currentResult);
   renderResult(currentResult);
   renderHistory();
-  if (data.quota) {
-    currentQuota = normalizeQuota(data.quota);
-    renderQuotaState();
-    renderPlatformAiAccessState();
-  }
   trackEvent('platform_api_success', {
     durationMs: performance.now() - startedAt,
     metadata: {
@@ -3113,21 +2979,21 @@ function platformApiErrorMessage(errorCode, fallback) {
   const messages = {
     AUTH_REQUIRED: '平台 AI 模式需要登录后使用。',
     INVALID_TOKEN: '登录状态已失效，请重新登录后再试。',
-    NO_QUOTA: '免费次数已用完，后续可 5 元购买 15 次完整求职分析额度。',
-    QUOTA_EXHAUSTED: '免费次数已用完，后续可 5 元购买 15 次完整求职分析额度。',
+    NO_QUOTA: '平台 AI 可用次数已达当前上限。每日 5 次、每月 30 次的真实计数仍待接入。',
+    QUOTA_EXHAUSTED: '平台 AI 可用次数已达当前上限。每日 5 次、每月 30 次的真实计数仍待接入。',
     RATE_LIMITED: '请求过于频繁，请稍后再试。',
     TEXT_TOO_LONG: '简历或岗位 JD 内容过长，请精简后再分析。',
     RESUME_TOO_LONG: '简历正文超过 12000 字，请精简后再分析，系统不会静默截断。',
     JD_TOO_LONG: '岗位 JD 超过 8000 字，请精简后再分析。',
     INPUT_TOO_LONG: '简历和岗位 JD 总长度超过 20000 字，请精简后再分析。',
-    REQUEST_ALREADY_COMPLETED: '本次请求已成功处理，系统不会再次调用模型或重复扣费。',
+    REQUEST_ALREADY_COMPLETED: '本次请求已成功处理，系统不会再次调用模型或重复计次。',
     REQUEST_IN_PROGRESS: '同一请求正在处理中，请勿重复提交。',
     REQUEST_ID_REQUIRES_RETRY: '上次请求未完成，请使用新的请求编号重试。',
-    MODEL_TIMEOUT: '模型响应超时，本次预留额度已退回，请稍后使用新的请求重试。',
-    MODEL_PROVIDER_ERROR: '模型服务暂时不可用，本次预留额度已退回，请稍后重试。',
-    INVALID_MODEL_OUTPUT: 'AI 返回结果未通过可信结构校验，本次预留额度已退回，不会展示不完整结果。',
+    MODEL_TIMEOUT: '模型响应超时，本次不会计入成功分析次数，请稍后使用新的请求重试。',
+    MODEL_PROVIDER_ERROR: '模型服务暂时不可用，本次不会计入成功分析次数，请稍后重试。',
+    INVALID_MODEL_OUTPUT: 'AI 返回结果未通过可信结构校验，本次不会计入成功分析次数，也不会展示不完整结果。',
     QUOTA_RESERVATION_FAILED: '额度预留失败，未调用模型，请稍后重试。',
-    QUOTA_REFUND_FAILED: '请求失败，但额度退款状态需要人工核对，请暂时不要重复提交。'
+    QUOTA_REFUND_FAILED: '请求失败，但后台状态需要人工核对，请暂时不要重复提交。'
   };
   return messages[errorCode] || fallback || '平台 AI 调用失败，请稍后重试或切换到本地演示模式。';
 }

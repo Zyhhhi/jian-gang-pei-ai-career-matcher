@@ -1,6 +1,8 @@
--- 简岗配 AI｜阶段 7 Supabase Auth + 平台 AI 额度表
+-- 简岗配 AI｜历史阶段 7 Supabase Auth + 平台 AI 额度表
 -- user_id 对应 auth.users.id。
--- 本阶段只做登录、额度查询和初始化；真实扣减必须在阶段 8 Cloudflare Worker 中完成。
+-- Stage 8.6C-A: 以下 legacy quota 字段仅为兼容已有 schema 保留，均已 deprecated。
+-- 前端不得读取、初始化、展示或依赖 platform_free_total、platform_free_used、platform_paid_credits。
+-- 后续免费每日/月度计数必须通过新的非破坏性 schema 与 service-role-only 逻辑实现。
 
 create table if not exists public.user_quota (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -33,9 +35,9 @@ with check (
   and platform_paid_credits = 0
 );
 
--- 不要给普通 authenticated 用户开放 paid_credits 更新权限。
--- 后续支付成功后的 paid_credits 增加，应由 Cloudflare Worker 或管理端使用服务端权限完成。
--- 后续真实分析时的 free_used / paid_credits 扣减，也必须由 Cloudflare Worker 校验登录、额度和限流后执行。
+-- 不要给普通 authenticated 用户开放 legacy quota 字段更新权限。
+-- 历史 paid_credits 增加路径已废弃；不得新增客户端写入或依赖。
+-- 后续真实分析次数必须由 Cloudflare Worker 校验登录、每日/月度限制和限流后执行。
 
 -- Stage 8.6B does not grant update access to browser roles. After this base
 -- table exists, run docs/migrations/20260714_stage_8_6b_atomic_ai_quota.sql.

@@ -1,8 +1,8 @@
 # 简岗配 AI Worker
 
-阶段 8 的 Cloudflare Worker 只服务平台 AI 模式：
+阶段 8 的 Cloudflare Worker 只为后续平台 AI 模式保留安全调用链：
 
-前端携带 Supabase access token、`requestId`、`analysisMode`、`resumeProfile` 和 `jobDraft` 调用 Worker。Worker 通过原子 RPC 先预留额度，再调用 DeepSeek；成功输出通过 Schema 1.0 校验后确认消费，失败、超时或无效输出通过 RPC 退款。
+若后续受控启用，前端会携带 Supabase access token、`requestId`、`analysisMode`、`resumeProfile` 和 `jobDraft` 调用 Worker。Worker 通过原子 RPC 先预留可用次数，再调用 DeepSeek；成功输出通过 Schema 1.0 校验后确认，失败、超时或无效输出通过 RPC 恢复预留。当前公开页面的 `ENABLE_PLATFORM_AI = false`，不会调用该 Worker。
 
 ## 环境变量
 
@@ -79,7 +79,7 @@ wrangler deploy
 - `docs/supabase_ai_requests.sql`
 - `docs/migrations/20260714_stage_8_6b_atomic_ai_quota.sql`
 
-`user_quota` 用于保存免费额度和付费额度。`ai_requests` 用于 requestId 幂等、状态审计和限流。Stage 8.6B migration 增加 `reserved / processing / success / failed / refunded` 状态、审计字段和以下 service-role-only RPC：
+`user_quota` 是历史可用次数兼容表；其中旧的 `platform_paid_credits` 字段已废弃，前端不展示、不读取、不依赖。每日 5 次、每月 30 次的正式规则尚未接入真实服务端计数。`ai_requests` 用于 requestId 幂等、状态审计和限流。Stage 8.6B migration 增加 `reserved / processing / success / failed / refunded` 状态、审计字段和以下 service-role-only RPC：
 
 - `reserve_ai_quota`
 - `mark_ai_request_processing`
@@ -94,15 +94,15 @@ wrangler deploy
 - 前端不能直接调用 DeepSeek。
 - 前端不能保存或展示 DeepSeek API Key。
 - Worker 不把简历原文、完整 JD、API Key 写入 `usage_events`。
-- 额度不足、登录失败、输入过长、重复请求和限流不会调用模型。
-- Provider 失败、超时、空内容、非 JSON 和 Schema 失败会恢复已预留额度。
+- 可用次数不足、登录失败、输入过长、重复请求和限流不会调用模型。
+- Provider 失败、超时、空内容、非 JSON 和 Schema 失败会恢复已预留次数。
 - 成功结果必须通过 Schema 1.0 的必填字段、类型、枚举、分数、requestId 和证据校验。
 - 简历与 JD 被包裹在明确的数据边界内，内容中的指令不会被视为系统指令。
 
 ## 当前限制
 
 - IP 限流目前作为预留说明。当前 Worker 使用 `ai_requests` 做用户级限流：同一用户 24 小时最多 10 次成功生成，同一用户 1 分钟最多 2 次请求。持久化 IP 限流建议后续使用 Durable Objects、WAF 或在 `ai_requests` 增加 `ip_hash` 字段。
-- 支付和增加 `platform_paid_credits` 不在阶段 8 实现。
+- 商业化入口已取消；`platform_paid_credits` 仅为数据库兼容字段，不得新增前端依赖。
 - 当前自动化仅使用 Mock Supabase RPC 和 Mock Provider。migration 未由本仓库自动部署，真实 JWT、真实 DeepSeek 与生产 Worker 尚待 8.6C 验收。
 
 ## JSON 解析失败策略
