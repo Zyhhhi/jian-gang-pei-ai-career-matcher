@@ -793,7 +793,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
         </div>
         <div class="privacy-grid">
           <div class="privacy-note"><strong>求职参考</strong>本工具仅提供求职准备参考，不保证面试或入职结果。</div>
-          <div class="privacy-note"><strong>本地保存</strong>当前版本默认使用当前浏览器 localStorage 保存简历档案、岗位草稿和求职记录。</div>
+          <div class="privacy-note"><strong>本地保存</strong>简历档案、岗位草稿和求职记录按当前登录账号或访客空间隔离保存在浏览器本地。</div>
           <div class="privacy-note"><strong>随时清空</strong>用户可以随时在“本地数据管理”中清空本地数据。</div>
           <div class="privacy-note"><strong>敏感信息</strong>请勿上传身份证号、银行卡号、家庭住址、无关聊天记录等敏感信息。</div>
         </div>
@@ -804,14 +804,14 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
         <div class="panel-head">
           <div>
             <h2>隐私与数据安全说明</h2>
-            <p class="hint">简历内容仅用于本次岗位匹配分析。当前版本默认将简历档案、岗位草稿和求职记录保存在当前浏览器本地，不会自动上传服务器。自带 API Key 仅保存在本地浏览器，不会写入代码仓库或云端数据库。后续平台 AI 模式下，简历和岗位 JD 会发送至 AI 服务用于生成分析结果，届时会明确提示用户确认。</p>
+            <p class="hint">简历内容仅用于本次岗位匹配分析。简历档案、岗位草稿和求职记录按当前登录账号或访客空间保存在浏览器本地，不会自动上传服务器。自带 API Key 仅在当前登录期间保存，退出或切换账号会清除。后续平台 AI 模式下，简历和岗位 JD 会发送至 AI 服务用于生成分析结果，届时会明确提示用户确认。</p>
           </div>
         </div>
         <div class="privacy-grid">
-          <div class="privacy-note"><strong>简历档案</strong>默认保存在当前浏览器 localStorage。</div>
-          <div class="privacy-note"><strong>岗位草稿</strong>默认保存在当前浏览器 localStorage。</div>
-          <div class="privacy-note"><strong>求职记录</strong>默认保存在当前浏览器 localStorage，不保存完整简历原文。</div>
-          <div class="privacy-note"><strong>自带 API Key</strong>默认只保存在当前浏览器 localStorage，不上传服务器、不写入 URL。</div>
+          <div class="privacy-note"><strong>简历档案</strong>按当前账号或访客空间保存在浏览器本地。</div>
+          <div class="privacy-note"><strong>岗位草稿</strong>按当前账号或访客空间保存在浏览器本地。</div>
+          <div class="privacy-note"><strong>求职记录</strong>按当前账号或访客空间保存在浏览器本地，不保存完整简历原文。</div>
+          <div class="privacy-note"><strong>自带 API Key</strong>仅在当前登录期间按账号保存；退出或切换账号会清除，不上传服务器、不写入 URL。</div>
         </div>
       </section>
 
@@ -1049,7 +1049,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
           <button class="mini-btn" type="button" onclick="clearJobDraftData()">清空岗位草稿</button>
           <button class="mini-btn" type="button" onclick="clearJobRecords()">清空求职记录</button>
           <button class="mini-btn" type="button" onclick="clearApiKey()">清除 API Key</button>
-          <button class="danger-btn" type="button" onclick="clearAllLocalData()">一键清空全部本地数据</button>
+          <button class="danger-btn" type="button" onclick="clearAllLocalData()">清空当前数据空间</button>
         </div>
       </section>
       <section class="panel" id="analyticsPanel">
@@ -1101,7 +1101,8 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 </main>
 
 <script>
-const STORAGE = {
+const STORAGE_SCHEMA_VERSION = '2';
+const STORAGE = Object.freeze({
   apiKey: 'userApiKey',
   legacyApiKey: 'jian_gang_pei_api_key',
   resumeProfile: 'resumeProfile',
@@ -1113,7 +1114,155 @@ const STORAGE = {
   analyticsQueue: 'analyticsQueue',
   feedbackRecords: 'feedbackRecords',
   aiMode: 'aiMode'
-};
+});
+
+const SCOPED_STORAGE_RESOURCES = Object.freeze([
+  STORAGE.apiKey,
+  STORAGE.resumeProfile,
+  STORAGE.jobDraft,
+  STORAGE.jobRecords,
+  STORAGE.history,
+  STORAGE.feedback,
+  STORAGE.feedbackRecords,
+  STORAGE.aiMode
+]);
+const DEVICE_STORAGE_RESOURCES = Object.freeze([STORAGE.anonymousUserId, STORAGE.analyticsQueue]);
+const LEGACY_QUARANTINE_PREFIX = 'jian_gang_pei:v2:legacy:quarantine';
+const LEGACY_QUARANTINE_MARKER = `${LEGACY_QUARANTINE_PREFIX}:migration-complete`;
+const STORAGE_SCHEMA_KEY = 'jian_gang_pei:storage_schema_version';
+
+function getVerifiedSupabaseSessionUserId(session) {
+  const userId = String(session?.user?.id || '');
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)
+    ? userId
+    : '';
+}
+
+function createLocalDataAccessLayer(storage) {
+  let activeScope = null;
+  let authScopeReady = false;
+
+  function safeGet(key) {
+    try { return storage?.getItem(key); } catch { return null; }
+  }
+  function safeSet(key, value) {
+    try { storage?.setItem(key, value); return true; } catch { return false; }
+  }
+  function safeRemove(key) {
+    try { storage?.removeItem(key); return true; } catch { return false; }
+  }
+  function safeParse(value, fallback) {
+    if (!value) return fallback;
+    try { return JSON.parse(value); } catch { return fallback; }
+  }
+  function scopedKey(resource) {
+    if (!authScopeReady || !activeScope || !SCOPED_STORAGE_RESOURCES.includes(resource)) return '';
+    const scope = activeScope.kind === 'user' ? `user:${activeScope.userId}` : 'guest';
+    return `jian_gang_pei:v2:${scope}:${resource}`;
+  }
+  function deviceKey(resource) {
+    return DEVICE_STORAGE_RESOURCES.includes(resource) ? resource : '';
+  }
+  function quarantineKey(resource) {
+    return `${LEGACY_QUARANTINE_PREFIX}:${resource}`;
+  }
+
+  return Object.freeze({
+    beginAuthRestore() {
+      authScopeReady = false;
+      activeScope = null;
+    },
+    activateFromVerifiedSession(session) {
+      const userId = getVerifiedSupabaseSessionUserId(session);
+      activeScope = userId ? { kind: 'user', userId } : { kind: 'guest', userId: '' };
+      authScopeReady = true;
+      return activeScope;
+    },
+    isAuthScopeReady() { return authScopeReady; },
+    getActiveUserId() { return activeScope?.kind === 'user' ? activeScope.userId : ''; },
+    getActiveScopeLabel() {
+      if (!authScopeReady) return 'pending';
+      return activeScope?.kind === 'user' ? 'user' : 'guest';
+    },
+    readJson(resource, fallback) {
+      const key = scopedKey(resource);
+      return key ? safeParse(safeGet(key), fallback) : fallback;
+    },
+    writeJson(resource, value) {
+      const key = scopedKey(resource);
+      if (!key) return false;
+      try { return safeSet(key, JSON.stringify(value)); } catch { return false; }
+    },
+    readText(resource, fallback = '') {
+      const key = scopedKey(resource);
+      return key ? (safeGet(key) ?? fallback) : fallback;
+    },
+    writeText(resource, value) {
+      const key = scopedKey(resource);
+      return key ? safeSet(key, String(value ?? '')) : false;
+    },
+    removeScoped(resource) {
+      const key = scopedKey(resource);
+      return key ? safeRemove(key) : false;
+    },
+    clearActiveScope() {
+      SCOPED_STORAGE_RESOURCES.forEach(resource => {
+        const key = scopedKey(resource);
+        if (key) safeRemove(key);
+      });
+    },
+    clearActiveUserApiKey() {
+      if (activeScope?.kind === 'user') this.removeScoped(STORAGE.apiKey);
+    },
+    readDeviceJson(resource, fallback) {
+      const key = deviceKey(resource);
+      return key ? safeParse(safeGet(key), fallback) : fallback;
+    },
+    writeDeviceJson(resource, value) {
+      const key = deviceKey(resource);
+      if (!key) return false;
+      try { return safeSet(key, JSON.stringify(value)); } catch { return false; }
+    },
+    readDeviceText(resource, fallback = '') {
+      const key = deviceKey(resource);
+      return key ? (safeGet(key) ?? fallback) : fallback;
+    },
+    writeDeviceText(resource, value) {
+      const key = deviceKey(resource);
+      return key ? safeSet(key, String(value ?? '')) : false;
+    },
+    migrateLegacySensitiveData() {
+      safeSet(STORAGE_SCHEMA_KEY, STORAGE_SCHEMA_VERSION);
+      if (safeGet(LEGACY_QUARANTINE_MARKER) === STORAGE_SCHEMA_VERSION) return;
+      const legacyResources = [
+        STORAGE.resumeProfile,
+        STORAGE.jobDraft,
+        STORAGE.jobRecords,
+        STORAGE.history,
+        STORAGE.feedback,
+        STORAGE.feedbackRecords,
+        STORAGE.aiMode
+      ];
+      let complete = true;
+      legacyResources.forEach(resource => {
+        const value = safeGet(resource);
+        if (value === null) return;
+        const target = quarantineKey(resource);
+        if (safeGet(target) === null && !safeSet(target, value)) {
+          complete = false;
+          return;
+        }
+        if (!safeRemove(resource)) complete = false;
+      });
+      // A legacy API Key is never quarantined or migrated across account scopes.
+      if (!safeRemove(STORAGE.apiKey)) complete = false;
+      if (!safeRemove(STORAGE.legacyApiKey)) complete = false;
+      if (complete) safeSet(LEGACY_QUARANTINE_MARKER, STORAGE_SCHEMA_VERSION);
+    }
+  });
+}
+
+const localDataStore = createLocalDataAccessLayer(window.localStorage);
 
 const ANALYTICS_CONFIG = {
   SUPABASE_URL: 'https://cesppeysiuvdwfcronmq.supabase.co',
@@ -1512,12 +1661,12 @@ const exampleCases = [
 
 init();
 function init() {
-  migrateLegacyApiKey();
+  localDataStore.beginAuthRestore();
+  localDataStore.migrateLegacySensitiveData();
   renderReleaseInfo();
   getAnonymousUserId();
   trackEvent('visit_site', { metadata: { page: 'index' } });
   apiKeyInput.value = '';
-  hydrateJobDraft();
   resumeInput.addEventListener('input', updateCounts);
   jdInput.addEventListener('input', handleJdTextChange);
   resumeFileInput.addEventListener('change', handleResumeFile);
@@ -1531,10 +1680,6 @@ function init() {
     const el = $(id);
     if (el) el.addEventListener('input', handleManualJobChange);
   });
-  renderResumeProfile();
-  renderHistory();
-  renderJobRecords();
-  renderApiKeyState();
   renderAiModeState();
   renderLocalDataStatus();
   renderAnalyticsDashboard();
@@ -1559,32 +1704,28 @@ function setStatus(text, type = '') {
   statusBox.textContent = text;
   statusBox.className = `status ${type}`.trim();
 }
-function migrateLegacyApiKey() {
-  const current = localStorage.getItem(STORAGE.apiKey);
-  const legacy = localStorage.getItem(STORAGE.legacyApiKey);
-  if (!current && legacy) localStorage.setItem(STORAGE.apiKey, legacy);
-  if (legacy) localStorage.removeItem(STORAGE.legacyApiKey);
-}
 function getUserApiKey() {
-  return localStorage.getItem(STORAGE.apiKey) || '';
+  return localDataStore.getActiveUserId()
+    ? localDataStore.readText(STORAGE.apiKey, '')
+    : '';
 }
 function getAiMode() {
-  const mode = localStorage.getItem(STORAGE.aiMode);
+  const mode = localDataStore.readText(STORAGE.aiMode, 'mock');
   if (['mock', 'own_api', 'platform_api'].includes(mode)) return mode;
-  localStorage.setItem(STORAGE.aiMode, 'mock');
+  localDataStore.writeText(STORAGE.aiMode, 'mock');
   return 'mock';
 }
 function selectAiMode(mode, source = 'mode_switch') {
   if (!['mock', 'own_api', 'platform_api'].includes(mode)) return;
   if (mode !== 'mock' && !currentAuthSession) {
-    localStorage.setItem(STORAGE.aiMode, 'mock');
+    localDataStore.writeText(STORAGE.aiMode, 'mock');
     renderAiModeState();
     renderLocalDataStatus();
     openLoginPanel();
     setStatus('登录后可选择平台 AI 或自带 API Key。本模式仅用于体验产品流程，当前请使用本地演示模式。', 'error');
     return;
   }
-  localStorage.setItem(STORAGE.aiMode, mode);
+  localDataStore.writeText(STORAGE.aiMode, mode);
   renderAiModeState();
   renderLocalDataStatus();
   const eventMap = {
@@ -1605,7 +1746,7 @@ function renderAiModeState() {
   let mode = getAiMode();
   if (mode !== 'mock' && !hasSession) {
     mode = 'mock';
-    localStorage.setItem(STORAGE.aiMode, mode);
+    localDataStore.writeText(STORAGE.aiMode, mode);
   }
   const cards = {
     mock: $('modeCardMock'),
@@ -1661,6 +1802,10 @@ function renderApiKeyState() {
 }
 function renderLocalDataStatus() {
   if (!localDataStatus) return;
+  if (!localDataStore.isAuthScopeReady()) {
+    localDataStatus.innerHTML = '<div class="data-status-item"><span>账户本地数据</span><strong>正在安全恢复…</strong></div>';
+    return;
+  }
   const profile = getResumeProfile();
   const draft = getJobDraft();
   const records = getJobRecords();
@@ -1676,6 +1821,41 @@ function renderLocalDataStatus() {
   localDataStatus.innerHTML = items.map(([label, value]) => `
     <div class="data-status-item"><span>${label}</span><strong>${value}</strong></div>
   `).join('');
+}
+function clearSensitivePageState() {
+  currentResult = null;
+  currentRecordId = null;
+  feedbackChoice = '';
+  ownApiRequestInFlight = false;
+  resumeInput.value = '';
+  jdInput.value = '';
+  apiKeyInput.value = '';
+  if (resumeFileInput) resumeFileInput.value = '';
+  if (jobScreenshotInput) jobScreenshotInput.value = '';
+  if (ownApiDirectConsent) ownApiDirectConsent.checked = false;
+  JOB_MANUAL_FIELDS.forEach(([, id]) => {
+    const el = $(id);
+    if (el) el.value = '';
+  });
+  if (resultPanel) resultPanel.classList.remove('visible');
+  if (resultContent) resultContent.innerHTML = '';
+  const historyBox = $('historyList');
+  if (historyBox) historyBox.innerHTML = '<div class="empty">正在切换本地数据空间…</div>';
+  if (jobRecordsList) jobRecordsList.innerHTML = '<div class="empty">正在切换本地数据空间…</div>';
+  if (profileView) profileView.innerHTML = '<div class="profile-empty">正在安全恢复本地数据…</div>';
+  if (screenshotList) screenshotList.innerHTML = '';
+  if (resumeFileMeta) resumeFileMeta.textContent = '';
+  if (resumeFileStatus) resumeFileStatus.textContent = '';
+}
+function loadActiveScopeData() {
+  hydrateJobDraft();
+  renderResumeProfile();
+  renderHistory();
+  renderJobRecords();
+  renderApiKeyState();
+  renderAiModeState();
+  renderLocalDataStatus();
+  updateCounts();
 }
 function authConfigured() {
   return Boolean(
@@ -1703,7 +1883,11 @@ async function initAuthModule() {
   renderAuthState();
   renderAiModeState();
   renderPlatformAiAccessState();
-  if (!authConfigured()) return;
+  renderLocalDataStatus();
+  if (!authConfigured()) {
+    syncAuthSession(null);
+    return;
+  }
   try {
     const client = await getSupabaseAuthClient();
     if (!client) return;
@@ -1717,6 +1901,7 @@ async function initAuthModule() {
       }
     });
   } catch (err) {
+    syncAuthSession(null);
     if (authStatus) {
       authStatus.textContent = '登录状态恢复失败，请刷新页面后重试。当前可继续使用本地演示模式。';
       authStatus.className = 'status error';
@@ -1995,6 +2180,11 @@ function renderAuthState() {
     authStatus.className = 'status';
     return;
   }
+  if (!localDataStore.isAuthScopeReady()) {
+    authStatus.textContent = '正在安全恢复登录状态，本地资料暂不加载。';
+    authStatus.className = 'status';
+    return;
+  }
   const email = currentAuthSession?.user?.email || '';
   const loginMethod = isMagicLinkLoginMode() ? 'Magic Link' : '邮箱验证码';
   authStatus.textContent = email
@@ -2003,7 +2193,22 @@ function renderAuthState() {
   authStatus.className = `status ${email ? 'success' : ''}`.trim();
 }
 function syncAuthSession(session) {
-  currentAuthSession = session || null;
+  const previousUserId = localDataStore.getActiveUserId();
+  const nextUserId = getVerifiedSupabaseSessionUserId(session);
+  const nextSession = nextUserId ? session : null;
+  const scopeAlreadyMatches = localDataStore.isAuthScopeReady()
+    && previousUserId === nextUserId;
+  if (!scopeAlreadyMatches) {
+    // Fixed privacy order: clear visible state, revoke the departing user's
+    // browser Key, activate only the verified session scope, then hydrate it.
+    clearSensitivePageState();
+    if (previousUserId && previousUserId !== nextUserId) localDataStore.clearActiveUserApiKey();
+    currentAuthSession = nextSession;
+    localDataStore.activateFromVerifiedSession(currentAuthSession);
+    loadActiveScopeData();
+  } else {
+    currentAuthSession = nextSession;
+  }
   renderAuthState();
   renderAiModeState();
   renderPlatformAiAccessState();
@@ -2049,13 +2254,13 @@ function confirmAction(message) {
   return window.confirm(message);
 }
 function getAnonymousUserId() {
-  let id = localStorage.getItem(STORAGE.anonymousUserId);
+  let id = localDataStore.readDeviceText(STORAGE.anonymousUserId, '');
   if (id) return id;
   const randomId = window.crypto?.randomUUID
     ? window.crypto.randomUUID()
     : `anon_${Date.now()}_${Math.random().toString(16).slice(2)}`;
   id = `anon_${randomId}`;
-  localStorage.setItem(STORAGE.anonymousUserId, id);
+  localDataStore.writeDeviceText(STORAGE.anonymousUserId, id);
   return id;
 }
 function analyticsEnabled() {
@@ -2066,15 +2271,11 @@ function analyticsEnabled() {
   );
 }
 function getAnalyticsQueue() {
-  try {
-    const queue = JSON.parse(localStorage.getItem(STORAGE.analyticsQueue) || '[]');
-    return Array.isArray(queue) ? queue : [];
-  } catch {
-    return [];
-  }
+  const queue = localDataStore.readDeviceJson(STORAGE.analyticsQueue, []);
+  return Array.isArray(queue) ? queue : [];
 }
 function saveAnalyticsQueue(queue) {
-  localStorage.setItem(STORAGE.analyticsQueue, JSON.stringify(queue.slice(-500)));
+  localDataStore.writeDeviceJson(STORAGE.analyticsQueue, queue.slice(-500));
 }
 function trackStartAnalysisArea() {
   if (hasTrackedStartAnalysis) return;
@@ -2125,7 +2326,10 @@ function sanitizeAnalyticsMetadata(metadata) {
   const blockedKeys = new Set([
     'resumeText', 'fullResume', 'jdText', 'fullJd', 'apiKey', 'userApiKey',
     'legacyApiKey', 'phone', 'email', 'realName', 'idCard', 'contact',
-    'screenshotBase64', 'imageBase64', 'fileContent', 'imageContent'
+    'screenshotBase64', 'imageBase64', 'fileContent', 'imageContent',
+    'user_id', 'userId', 'uid', 'session', 'access_token', 'refresh_token',
+    'report', 'fullReport', 'result', 'resumeProfile', 'jobDraft', 'history', 'feedback',
+    'content', 'comment', 'rawText'
   ]);
   if (!metadata || typeof metadata !== 'object') return {};
   return Object.fromEntries(Object.entries(metadata)
@@ -2214,12 +2418,7 @@ function createEmptyJobDraft() {
   };
 }
 function getJobDraft() {
-  try {
-    const draft = JSON.parse(localStorage.getItem(STORAGE.jobDraft) || 'null');
-    return normalizeJobDraft(draft);
-  } catch {
-    return createEmptyJobDraft();
-  }
+  return normalizeJobDraft(localDataStore.readJson(STORAGE.jobDraft, null));
 }
 function normalizeJobDraft(draft) {
   const empty = createEmptyJobDraft();
@@ -2240,7 +2439,7 @@ function saveJobDraft(patch = {}, render = true) {
     ...patch,
     updatedAt: new Date().toLocaleString()
   };
-  localStorage.setItem(STORAGE.jobDraft, JSON.stringify(draft));
+  localDataStore.writeJson(STORAGE.jobDraft, draft);
   if (render) renderJobDraftState(draft);
   renderLocalDataStatus();
   return draft;
@@ -2444,8 +2643,7 @@ function formatFileSize(bytes) {
   return `${Math.max(1, Math.round(n / 1024))}KB`;
 }
 function getResumeProfile() {
-  try { return JSON.parse(localStorage.getItem(STORAGE.resumeProfile) || 'null'); }
-  catch { return null; }
+  return localDataStore.readJson(STORAGE.resumeProfile, null);
 }
 function renderResumeProfile() {
   const profile = getResumeProfile();
@@ -2454,7 +2652,7 @@ function renderResumeProfile() {
       <div class="profile-empty">
         请先上传或粘贴一份简历，系统将生成本地简历档案。后续分析岗位时无需重复上传。
       </div>
-      <div class="profile-safe">简历档案默认仅保存在当前浏览器本地，可随时删除。</div>
+      <div class="profile-safe">简历档案仅保存在当前账号或访客空间的浏览器本地，可随时删除。</div>
     `;
     analyzeHint.textContent = '请先创建简历档案，再确认岗位 JD 文本。简历文件可在本地解析，岗位截图当前不做 OCR。';
     analyzeBtn.disabled = false;
@@ -2476,7 +2674,7 @@ function renderResumeProfile() {
       <button class="secondary-btn" type="button" onclick="showProfileEditor(true)">重新上传简历</button>
       <button class="plain-btn" type="button" onclick="deleteResumeProfile()">删除当前简历</button>
     </div>
-    <div class="profile-safe">当前将使用已保存的简历档案进行岗位分析，无需重复上传简历。简历档案默认仅保存在当前浏览器本地，可随时删除。</div>
+    <div class="profile-safe">当前将使用已保存的简历档案进行岗位分析，无需重复上传简历。简历档案仅保存在当前账号或访客空间的浏览器本地，可随时删除。</div>
   `;
   resumeInput.value = profile.resumeText || '';
   updateCounts();
@@ -2526,7 +2724,7 @@ function saveResumeProfile() {
     createdAt: existing?.createdAt || now,
     updatedAt: now
   };
-  localStorage.setItem(STORAGE.resumeProfile, JSON.stringify(profile));
+  localDataStore.writeJson(STORAGE.resumeProfile, profile);
   renderResumeProfile();
   renderLocalDataStatus();
   trackEvent('resume_profile_created', {
@@ -2540,7 +2738,7 @@ function saveResumeProfile() {
 function deleteResumeProfile() {
   const ok = confirmAction('删除后，本地简历档案将被清空，后续分析需要重新上传简历。');
   if (!ok) return;
-  localStorage.removeItem(STORAGE.resumeProfile);
+  localDataStore.removeScoped(STORAGE.resumeProfile);
   resumeInput.value = '';
   renderResumeProfile();
   renderLocalDataStatus();
@@ -2814,8 +3012,7 @@ function saveApiKey() {
     setStatus('请先填写 API Key，再点击保存。', 'error');
     return;
   }
-  localStorage.setItem(STORAGE.apiKey, key);
-  localStorage.removeItem(STORAGE.legacyApiKey);
+  localDataStore.writeText(STORAGE.apiKey, key);
   apiKeyInput.value = '';
   if (ownApiDirectConsent) ownApiDirectConsent.checked = false;
   renderApiKeyState();
@@ -2827,10 +3024,9 @@ function saveApiKey() {
   setStatus('API Key 已保存到当前浏览器本地，不会上传服务器、写入 URL 或代码仓库。', 'success');
 }
 function clearApiKey() {
-  const ok = confirmAction('确认清除当前浏览器中保存的自带 API Key 吗？');
+  const ok = confirmAction('确认清除当前账号在本浏览器中保存的自带 API Key 吗？');
   if (!ok) return;
-  localStorage.removeItem(STORAGE.apiKey);
-  localStorage.removeItem(STORAGE.legacyApiKey);
+  localDataStore.removeScoped(STORAGE.apiKey);
   apiKeyInput.value = '';
   if (ownApiDirectConsent) ownApiDirectConsent.checked = false;
   renderApiKeyState();
@@ -2839,7 +3035,7 @@ function clearApiKey() {
   trackEvent('api_key_cleared', {
     metadata: { aiMode: getAiMode(), hasApiKey: false, source: 'settings' }
   });
-  setStatus('已清除当前浏览器中的自带 API Key。', 'success');
+  setStatus('已清除当前账号的自带 API Key。', 'success');
 }
 function fillExample() {
   const example = exampleCases[Math.floor(Math.random() * exampleCases.length)];
@@ -2879,9 +3075,9 @@ function clearInputs() {
   setStatus('已清空岗位 JD 草稿，简历档案仍保存在当前浏览器本地。');
 }
 function clearResumeProfileData() {
-  const ok = confirmAction('确认清空当前浏览器中的简历档案吗？后续分析需要重新上传或粘贴简历。');
+  const ok = confirmAction('确认清空当前数据空间中的简历档案吗？后续分析需要重新上传或粘贴简历。');
   if (!ok) return;
-  localStorage.removeItem(STORAGE.resumeProfile);
+  localDataStore.removeScoped(STORAGE.resumeProfile);
   resumeInput.value = '';
   renderResumeProfile();
   renderLocalDataStatus();
@@ -2892,7 +3088,7 @@ function clearResumeProfileData() {
 function clearJobDraftData() {
   const ok = confirmAction('确认清空当前浏览器中的岗位草稿吗？这会删除 JD 文本、手动补充信息和截图元信息。');
   if (!ok) return;
-  localStorage.removeItem(STORAGE.jobDraft);
+  localDataStore.removeScoped(STORAGE.jobDraft);
   jdInput.value = '';
   JOB_MANUAL_FIELDS.forEach(([, id]) => {
     const el = $(id);
@@ -2907,17 +3103,17 @@ function clearJobDraftData() {
   setStatus('岗位草稿已清空。', 'success');
 }
 function clearAllLocalData() {
-  const ok = confirmAction('确认清空全部本地数据吗？这将删除当前浏览器中的简历档案、岗位草稿、求职记录和自带 API Key。此操作不可恢复。');
+  const ok = confirmAction('确认清空当前账号或访客空间的本地数据吗？这将删除该空间的简历档案、岗位草稿、求职记录和自带 API Key，不影响其他账号空间。此操作不可恢复。');
   if (!ok) return;
   trackEvent('clear_all_local_data', {
     metadata: {
       hasResumeProfile: Boolean(getResumeProfile()),
-      hasJobDraft: Boolean(localStorage.getItem(STORAGE.jobDraft)),
+      hasJobDraft: Boolean(localDataStore.readJson(STORAGE.jobDraft, null)),
       jobRecordCount: getJobRecords().length,
       hasApiKey: Boolean(getUserApiKey())
     }
   });
-  getProjectStorageKeys().forEach(key => localStorage.removeItem(key));
+  localDataStore.clearActiveScope();
   resumeInput.value = '';
   jdInput.value = '';
   apiKeyInput.value = '';
@@ -2937,22 +3133,7 @@ function clearAllLocalData() {
   renderLocalDataStatus();
   renderAnalyticsDashboard();
   updateCounts();
-  setStatus('已清空全部简岗配 AI 本地数据。', 'success');
-}
-function getProjectStorageKeys() {
-  return [
-    STORAGE.resumeProfile,
-    STORAGE.jobDraft,
-    STORAGE.jobRecords,
-    STORAGE.apiKey,
-    STORAGE.legacyApiKey,
-    STORAGE.history,
-    STORAGE.feedback,
-    STORAGE.anonymousUserId,
-    STORAGE.analyticsQueue,
-    STORAGE.feedbackRecords,
-    STORAGE.aiMode
-  ];
+  setStatus('已清空当前数据空间的本地数据。', 'success');
 }
 function setStep(index) {
   progressBox.classList.add('active');
@@ -4441,7 +4622,7 @@ function saveCurrentJobRecord() {
   const records = getJobRecords();
   const record = createJobRecordFromResult(currentResult);
   records.unshift(record);
-  localStorage.setItem(STORAGE.jobRecords, JSON.stringify(records.slice(0, 50)));
+  localDataStore.writeJson(STORAGE.jobRecords, records.slice(0, 50));
   renderJobRecords();
   renderLocalDataStatus();
   trackEvent('save_job_record', {
@@ -4454,8 +4635,8 @@ function saveCurrentJobRecord() {
   setStatus('已保存到求职记录。记录不包含完整简历原文。', 'success');
 }
 function getJobRecords() {
-  try { return JSON.parse(localStorage.getItem(STORAGE.jobRecords) || '[]'); }
-  catch { return []; }
+  const records = localDataStore.readJson(STORAGE.jobRecords, []);
+  return Array.isArray(records) ? records : [];
 }
 function renderJobRecords() {
   const records = getJobRecords();
@@ -4484,7 +4665,7 @@ function loadJobRecord(id) {
 }
 function deleteJobRecord(id) {
   const records = getJobRecords().filter(item => item.id !== id);
-  localStorage.setItem(STORAGE.jobRecords, JSON.stringify(records));
+  localDataStore.writeJson(STORAGE.jobRecords, records);
   renderJobRecords();
   renderLocalDataStatus();
   trackEvent('delete_job_record');
@@ -4493,7 +4674,7 @@ function deleteJobRecord(id) {
 function clearJobRecords() {
   const ok = confirmAction('确认清空全部求职记录吗？清空后无法恢复。');
   if (!ok) return;
-  localStorage.removeItem(STORAGE.jobRecords);
+  localDataStore.removeScoped(STORAGE.jobRecords);
   renderJobRecords();
   renderLocalDataStatus();
   setStatus('求职记录已清空。');
@@ -4517,12 +4698,12 @@ function saveHistory(result) {
       screenshotFiles: draft.screenshotFiles || []
     }
   });
-  localStorage.setItem(STORAGE.history, JSON.stringify(records.slice(0, 20)));
+  localDataStore.writeJson(STORAGE.history, records.slice(0, 20));
   return id;
 }
 function getHistory() {
-  try { return JSON.parse(localStorage.getItem(STORAGE.history) || '[]'); }
-  catch { return []; }
+  const records = localDataStore.readJson(STORAGE.history, []);
+  return Array.isArray(records) ? records : [];
 }
 function renderHistory() {
   const records = getHistory();
@@ -4552,11 +4733,11 @@ function loadHistory(id) {
 }
 function deleteHistory(id) {
   const records = getHistory().filter(r => r.id !== id);
-  localStorage.setItem(STORAGE.history, JSON.stringify(records));
+  localDataStore.writeJson(STORAGE.history, records);
   renderHistory();
 }
 function clearHistory() {
-  localStorage.removeItem(STORAGE.history);
+  localDataStore.removeScoped(STORAGE.history);
   renderHistory();
   setStatus('历史记录已清空。');
 }
@@ -4576,7 +4757,7 @@ function submitFeedback() {
     comment: sanitizeSensitiveText($('feedbackText')?.value.trim() || '').slice(0, 300),
     createdAt: new Date().toLocaleString()
   });
-  localStorage.setItem(STORAGE.feedback, JSON.stringify(records.slice(0, 50)));
+  localDataStore.writeJson(STORAGE.feedback, records.slice(0, 50));
   trackEvent('submit_feedback', {
     metadata: {
       feedbackType: '分析结果反馈',
@@ -4588,8 +4769,8 @@ function submitFeedback() {
   setStatus('反馈已保存到当前浏览器。后续可以升级为数据库或表单收集。', 'success');
 }
 function getFeedback() {
-  try { return JSON.parse(localStorage.getItem(STORAGE.feedback) || '[]'); }
-  catch { return []; }
+  const records = localDataStore.readJson(STORAGE.feedback, []);
+  return Array.isArray(records) ? records : [];
 }
 function submitSiteFeedback() {
   const type = siteFeedbackType?.value || '其他';
@@ -4610,7 +4791,7 @@ function submitSiteFeedback() {
   if (!analyticsEnabled()) {
     const records = getFeedbackRecords();
     records.unshift(record);
-    localStorage.setItem(STORAGE.feedbackRecords, JSON.stringify(records.slice(0, 80)));
+    localDataStore.writeJson(STORAGE.feedbackRecords, records.slice(0, 80));
   }
   trackEvent('submit_feedback', {
     metadata: {
@@ -4626,12 +4807,8 @@ function submitSiteFeedback() {
   setStatus('反馈已提交。当前不会保存具体联系方式，也不会记录简历原文、完整 JD 或 API Key。', 'success');
 }
 function getFeedbackRecords() {
-  try {
-    const records = JSON.parse(localStorage.getItem(STORAGE.feedbackRecords) || '[]');
-    return Array.isArray(records) ? records : [];
-  } catch {
-    return [];
-  }
+  const records = localDataStore.readJson(STORAGE.feedbackRecords, []);
+  return Array.isArray(records) ? records : [];
 }
 function sanitizeSensitiveText(text) {
   return String(text || '')

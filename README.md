@@ -43,7 +43,12 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 
 ## 本地数据与隐私
 
-- `resumeProfile`、`jobDraft`、`jobRecords` 和 `userApiKey` 均保存在当前浏览器 `localStorage`。
+- 敏感本地数据使用单一的 V2 存储访问层和 schema version `2`。已登录数据的键为 `jian_gang_pei:v2:user:<Supabase user.id>:<resource>`；访客数据为 `jian_gang_pei:v2:guest:<resource>`。`user.id` 只从已验证的 Supabase session 获取。
+- `resumeProfile`、`jobDraft`、`jobRecords`、分析历史、反馈、`aiMode` 和自带 Key 都按上述空间隔离。登录状态尚在恢复时默认不读取任何敏感空间，避免上一账号资料闪现；账号切换或退出时先清空页面内存，再解析新空间并加载。
+- 自带 Key 可在同一已登录账号刷新后恢复；登出、session 失效或切换账号时会删除离开账号的 Key，另一个账号不能继承它。未迁移任何旧全局 Key。
+- 旧版全局敏感数据只会一次性移至 `jian_gang_pei:v2:legacy:quarantine:<resource>`，不会自动归属给第一个登录账号；旧 Key 直接删除。旧数据的“主动导入”界面尚未实现。
+- `anonymousUserId` 与净化后的 `analyticsQueue` 仍是设备级数据；其中不允许保存简历、JD、Key、分析全文、邮箱或 `user.id`。浏览器本地存储并非加密存储，共用设备仍应使用退出登录和“清空当前数据空间”。
+- “清空本地数据”仅清空当前账号或访客空间，不会删除其他账号空间。
 - TXT、PDF、DOCX 只在浏览器本地解析，不上传原始文件。
 - 用户自带 API Key 不写入 URL、Supabase、Worker 日志或代码仓库。
 - 自带 Key 固定请求 `https://api.deepseek.com/chat/completions`，固定模型 `deepseek-v4-flash`；不接受用户填写任意 Base URL。Key 只出现在浏览器到 DeepSeek 的 Authorization 请求头，不进入 Prompt、历史记录、埋点、错误信息或页面日志。
@@ -100,6 +105,12 @@ node --test tests/login-mode.contract.test.mjs
 
 ```powershell
 node --test tests/own-api-direct.contract.test.mjs
+```
+
+本地数据隔离契约测试：
+
+```powershell
+node --test tests/local-data-isolation.contract.test.mjs
 ```
 
 不要在本地检查中连接真实 Supabase、调用真实 DeepSeek、执行 migration 或部署 Worker。

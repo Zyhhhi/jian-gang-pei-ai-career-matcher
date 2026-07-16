@@ -34,7 +34,15 @@ V2 的失败、超时和非法输出会释放请求创建时记录的日/月预�
 - 请求固定直连 `https://api.deepseek.com/chat/completions`，不经过 Worker、Supabase 或任何代理；不允许填写任意 Base URL。
 - 开始分析前明确提示：简历与已确认 JD 会直接发送给 DeepSeek；失败不回退 Mock，只有本地 JSON 结构校验通过后才保存结果。
 
-当前页面已实现登录后的自带 DeepSeek Key 真实直连、超时和服务错误提示、响应 JSON 结构校验及无 Mock 失败路径。Key 不进入 Prompt、URL、历史记录、埋点、错误信息、Supabase 或 Worker。已完成本地浏览器 CORS 探针验证；GitHub Pages 生产域名仍待发布前二次验收，失败则停止功能发布且不引入代理。
+当前页面已实现登录后的自带 DeepSeek Key 真实直连、超时和服务错误提示、响应 JSON 结构校验及无 Mock 失败路径。Key 不进入 Prompt、URL、历史记录、埋点、错误信息、Supabase 或 Worker。Key 仅在当前已登录账号的 V2 浏览器存储空间中保存以支持刷新恢复，账号登出、session 失效或切换时立即删除，不会被其他账号复用。已完成本地浏览器 CORS 探针验证；GitHub Pages 生产域名仍待发布前二次验收，失败则停止功能发布且不引入代理。
+
+## 本地数据隔离
+
+敏感浏览器数据采用 schema version `2` 的唯一访问层。登录用户使用 `jian_gang_pei:v2:user:<uid>:<resource>`，未登录访客使用 `jian_gang_pei:v2:guest:<resource>`；`uid` 只取自已验证的 Supabase session。`resumeProfile`、`jobDraft`、`jobRecords`、分析历史、反馈、`feedbackRecords`、`aiMode` 和自带 Key 均按 scope 隔离，不上传 Supabase。
+
+认证恢复期间默认不加载敏感数据。登录、退出、session 失效和 A→B 切换均依序清空页面内存/输入/结果/文件引用，删除离开账号的 Key，解析新 scope，再加载新 scope，防止上一账号数据闪现。清空本地数据只影响当前 scope，不会清除其他账号。
+
+升级时，旧版全局敏感键会一次性复制到 `jian_gang_pei:v2:legacy:quarantine:<resource>` 后删除原键，且有完成标记保证幂等；它们不会自动归属给任一账号。旧全局 API Key 不进入 quarantine，直接删除。当前尚未提供由用户确认的旧数据导入界面。设备级 `anonymousUserId` 与已净化的 `analyticsQueue` 不含简历、JD、Key、分析全文、邮箱或用户 ID。
 
 ## 登录路线
 

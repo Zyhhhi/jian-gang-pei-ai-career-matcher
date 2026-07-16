@@ -28,7 +28,7 @@ function createHarness(overrides = {}) {
     getSession: async () => ({ data: { session: null }, error: null }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
     signInWithOtp: async () => ({ data: { user: null, session: null }, error: null }),
-    verifyOtp: async () => ({ data: { session: { user: { email: 'tester@example.com' }, access_token: 'mock-access' } }, error: null }),
+    verifyOtp: async () => ({ data: { session: { user: { id: '11111111-1111-4111-8111-111111111111', email: 'tester@example.com' }, access_token: 'mock-access' } }, error: null }),
     signOut: async () => ({ error: null }),
     ...overrides.auth
   };
@@ -62,6 +62,16 @@ function createHarness(overrides = {}) {
     const trackEvent = (event, data) => events.push({ event, data });
     const authEventMetadata = (source) => ({ source });
     const renderAiModeState = () => { gateRenderCount += 1; };
+    const renderLocalDataStatus = () => {};
+    const clearSensitivePageState = () => {};
+    const loadActiveScopeData = () => {};
+    const getVerifiedSupabaseSessionUserId = (session) => session?.user?.id || '';
+    const localDataStore = {
+      getActiveUserId: () => '',
+      isAuthScopeReady: () => false,
+      clearActiveUserApiKey: () => {},
+      activateFromVerifiedSession: () => {}
+    };
     ${authModuleSource}
     return {
       nodes, intervals, otpLoginState,
@@ -121,7 +131,7 @@ test('倒计时阻止重发，更换邮箱会清空验证码和倒计时', async
 
 test('验证码验证传入 email、token、type=email，并立即更新 session', async () => {
   const calls = [];
-  const session = { user: { email: 'tester@example.com' }, access_token: 'mock-access' };
+  const session = { user: { id: '11111111-1111-4111-8111-111111111111', email: 'tester@example.com' }, access_token: 'mock-access' };
   const harness = createHarness({ auth: { verifyOtp: async (params) => { calls.push(params); return { data: { session }, error: null }; } } });
   harness.nodes.loginEmailInput.value = 'tester@example.com';
   await harness.sendEmailOtp();
@@ -151,7 +161,7 @@ test('错误和过期验证码使用中文提示，且不泄露服务端消息',
 });
 
 test('session 恢复与退出会更新页面登录门禁状态', async () => {
-  const restored = { user: { email: 'restore@example.com' }, access_token: 'mock-access' };
+  const restored = { user: { id: '11111111-1111-4111-8111-111111111111', email: 'restore@example.com' }, access_token: 'mock-access' };
   const harness = createHarness({ auth: { getSession: async () => ({ data: { session: restored }, error: null }) } });
   await harness.initAuthModule();
   assert.equal(harness.getCurrentSession(), restored);

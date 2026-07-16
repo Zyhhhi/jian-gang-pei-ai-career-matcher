@@ -20,7 +20,7 @@
 - `email_otp` 的发送、验证、倒计时与 Mock 测试必须继续保留，但默认隐藏且不得由普通用户触发。只有完成 SMTP 模板与真实验收后，才可将 `LOGIN_MODE` 改为 `email_otp`。
 - 真实 Supabase 邮件模板、邮件服务、OTP 过期时间、发送频率和真实收码登录均未在本阶段配置或验证。管理员只能按 `docs/supabase-email-otp-setup.md` 手动配置，不能把这些待办写成已完成。
 - 产品目标为 6 位验证码，但未读取真实后台配置；前端只接受数字而不固定长度。
-- 自带 DeepSeek API Key 已固定直连 `https://api.deepseek.com/chat/completions`，模型固定为 `deepseek-v4-flash`；Key 仅保存于浏览器 localStorage，不能进入 URL、Prompt、历史、埋点、错误信息、Supabase、Worker 或代码仓库。
+- 自带 DeepSeek API Key 已固定直连 `https://api.deepseek.com/chat/completions`，模型固定为 `deepseek-v4-flash`；Key 仅能通过 V2 本地存储访问层按已验证 Supabase `user.id` 空间保存，不能进入 URL、Prompt、历史、埋点、错误信息、Supabase、Worker 或代码仓库。Key 可在同一账号刷新后恢复，但登出、session 失效或账号切换时必须删除离开账号的 Key。
 - 自带 Key 调用前必须同时满足：已登录、已保存有效 Key、已确认简历与 JD 将直接发送给 DeepSeek；失败不得回退 Mock，只有通过本地 JSON 结构校验后才可渲染并写入本地历史。
 - 已由本地浏览器探针确认 DeepSeek 直连 CORS 可用；GitHub Pages 正式域名仍须在发布前做一次独立 CORS 验收。若正式域名 CORS 失败，停止该功能发布，不得引入代理。
 - 当前平台 AI 仍处于测试阶段；前端不得调用 Worker、DeepSeek 或真实 Supabase 额度 RPC。
@@ -28,6 +28,10 @@
 
 ## 数据安全边界
 
+- 敏感浏览器数据必须只经过唯一的 V2 存储访问层，禁止业务代码直接调用 `localStorage.getItem`、`setItem` 或 `removeItem`。登录用户键格式为 `jian_gang_pei:v2:user:<uid>:<resource>`，访客键格式为 `jian_gang_pei:v2:guest:<resource>`；`uid` 只可来自已验证的 Supabase session。
+- session 恢复完成前默认拒绝读取敏感本地数据。账号变化必须依次清空页面内存与文件引用、删除离开账号 Key、激活新的 verified scope、加载新 scope，不能闪现上一账号数据。
+- 旧全局敏感键只能一次性移至 legacy quarantine，不能自动导入任何账号；旧全局 API Key 必须直接删除。当前不提供旧数据导入 UI，未来如增加必须由当前登录用户主动确认。
+- `anonymousUserId` 和净化后的 `analyticsQueue` 可保持设备级，但不得含简历、JD、Key、分析全文、邮箱、`user.id`、token 或原始反馈正文。“清空本地数据”只可清空当前 active scope。
 - 用户 API Key 只能保存在浏览器本地，不能上传 Supabase、Worker、URL 或代码仓库。
 - 简历原文、完整 JD 和原始上传文件默认只保存在浏览器本地。
 - Supabase 仅可保存登录、匿名行为和未来由服务端管理的必要使用状态；前端不得使用 service role key。
@@ -53,4 +57,5 @@
 - 页面规则改动至少检查：未登录只能 Mock、非 Mock 不发 Worker、`ENABLE_PLATFORM_AI` 为 false、收费文案和付费埋点已移除、导入函数仍在。
 - 登录模式改动至少运行 `node --test tests/login-mode.contract.test.mjs` 与 `node --test tests/otp-auth.contract.test.mjs`，检查默认 Magic Link redirect、OTP 休眠保留、session 恢复和退出后的门禁。
 - 自带 DeepSeek Key 改动至少运行 `node --test tests/own-api-direct.contract.test.mjs`，检查固定端点、无 Key 请求体泄露、结构校验、错误不回退 Mock 与未登录门禁。
+- 本地敏感数据或认证切换改动至少运行 `node --test tests/local-data-isolation.contract.test.mjs`，检查 auth 恢复默认拒绝、guest/A/B 隔离、定向 Key 清除、legacy quarantine、损坏 JSON 降级与切换顺序。
 - 未获明确授权时，不连接真实 Supabase、不执行 migration、不调用真实 DeepSeek、不部署 Worker、不 push。
