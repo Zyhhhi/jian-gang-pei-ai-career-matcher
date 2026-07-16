@@ -3591,7 +3591,9 @@ function handlePlatformApiFailure(data = {}, startedAt = performance.now()) {
     durationMs: performance.now() - startedAt,
     metadata
   });
-  if (['QUOTA_EXHAUSTED', 'NO_QUOTA'].includes(errorCode)) trackEvent('quota_exhausted', { success: false, metadata });
+  if (['DAILY_QUOTA_EXHAUSTED', 'MONTHLY_QUOTA_EXHAUSTED', 'QUOTA_EXHAUSTED', 'NO_QUOTA'].includes(errorCode)) {
+    trackEvent('quota_exhausted', { success: false, metadata });
+  }
   if (errorCode === 'RATE_LIMITED') trackEvent('rate_limited', { success: false, metadata });
   if (['TEXT_TOO_LONG', 'RESUME_TOO_LONG', 'JD_TOO_LONG', 'INPUT_TOO_LONG'].includes(errorCode)) trackEvent('text_too_long', { success: false, metadata });
   if (errorCode === 'INVALID_MODEL_OUTPUT') trackEvent('deepseek_parse_failed', { success: false, metadata });
@@ -3602,8 +3604,10 @@ function platformApiErrorMessage(errorCode, fallback) {
   const messages = {
     AUTH_REQUIRED: '平台 AI 模式需要登录后使用。',
     INVALID_TOKEN: '登录状态已失效，请重新登录后再试。',
-    NO_QUOTA: '平台 AI 可用次数已达当前上限。每日 5 次、每月 30 次的真实计数仍待接入。',
-    QUOTA_EXHAUSTED: '平台 AI 可用次数已达当前上限。每日 5 次、每月 30 次的真实计数仍待接入。',
+    DAILY_QUOTA_EXHAUSTED: '平台 AI 今日成功分析次数已达 5 次上限，请在明天（Asia/Shanghai）再试。',
+    MONTHLY_QUOTA_EXHAUSTED: '平台 AI 本月成功分析次数已达 30 次上限，请在下月（Asia/Shanghai）再试。',
+    NO_QUOTA: '平台 AI 可用次数已达当前上限，请稍后再试。',
+    QUOTA_EXHAUSTED: '平台 AI 可用次数已达当前上限，请稍后再试。',
     RATE_LIMITED: '请求过于频繁，请稍后再试。',
     TEXT_TOO_LONG: '简历或岗位 JD 内容过长，请精简后再分析。',
     RESUME_TOO_LONG: '简历正文超过 12000 字，请精简后再分析，系统不会静默截断。',
@@ -3611,6 +3615,7 @@ function platformApiErrorMessage(errorCode, fallback) {
     INPUT_TOO_LONG: '简历和岗位 JD 总长度超过 20000 字，请精简后再分析。',
     REQUEST_ALREADY_COMPLETED: '本次请求已成功处理，系统不会再次调用模型或重复计次。',
     REQUEST_IN_PROGRESS: '同一请求正在处理中，请勿重复提交。',
+    REQUEST_ID_CONFLICT: '该请求编号不可用，请生成新的请求后重试。',
     REQUEST_ID_REQUIRES_RETRY: '上次请求未完成，请使用新的请求编号重试。',
     MODEL_TIMEOUT: '模型响应超时，本次不会计入成功分析次数，请稍后使用新的请求重试。',
     MODEL_PROVIDER_ERROR: '模型服务暂时不可用，本次不会计入成功分析次数，请稍后重试。',

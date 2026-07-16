@@ -63,20 +63,11 @@ export async function handleRequest(request, env, dependencies = {}) {
   const userId = user.id;
   const model = String(env.DEEPSEEK_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL;
 
-  try {
-    const existing = await findAiRequest(env, requestId, fetchImpl);
-    const replay = mapExistingRequest(existing, userId);
-    if (replay) return json(failure(replay.errorCode, replay.message), replay.status, cors);
-
-    const rateLimit = await checkRateLimit(env, userId, fetchImpl);
-    if (rateLimit) return json(failure('RATE_LIMITED', rateLimit), 429, cors);
-  } catch {
-    return json(failure('QUOTA_RESERVATION_FAILED', 'Unable to verify request quota safely.'), 503, cors);
-  }
-
   let reservation;
   try {
-    reservation = firstRpcRow(await supabaseRpc(env, 'reserve_ai_quota', {
+    // V2 reserve is the only authority for request-id replay, stale recovery,
+    // rolling rate limiting and Asia/Shanghai daily/monthly reservations.
+    reservation = firstRpcRow(await supabaseRpc(env, 'reserve_platform_ai_quota_v2', {
       p_request_id: requestId,
       p_user_id: userId,
       p_model: model,
@@ -84,18 +75,32 @@ export async function handleRequest(request, env, dependencies = {}) {
     }, fetchImpl));
   } catch {
     try {
-      const committed = await findAiRequest(env, requestId, fetchImpl);
-      if (committed?.user_id === userId && committed.status === 'reserved') {
-        reservation = {
-          outcome: 'reserved',
-          request_status: 'reserved',
-          reserved_quota_type: committed.quota_type
-        };
+      // Retrying the idempotent V2 reserve obtains the authoritative snapshot
+      // when the first RPC committed but its HTTP response was lost.
+      const retriedReservation = firstRpcRow(await supabaseRpc(env, 'reserve_platform_ai_quota_v2', {
+        p_request_id: requestId,
+        p_user_id: userId,
+        p_model: model,
+        p_input_chars: inputChars
+      }, fetchImpl));
+      if (['reserved', 'in_progress'].includes(retriedReservation?.outcome)) {
+        reservation = { ...retriedReservation, outcome: 'reserved', request_status: 'reserved' };
       } else {
         return json(failure('QUOTA_RESERVATION_FAILED', 'Unable to reserve platform AI quota.'), 503, cors);
       }
     } catch {
-      return json(failure('QUOTA_RESERVATION_FAILED', 'Unable to reserve platform AI quota.'), 503, cors);
+      try {
+        const committed = await findAiRequest(env, requestId, fetchImpl);
+        if (committed?.user_id === userId
+          && committed.quota_policy === 'daily_monthly_v2'
+          && committed.status === 'reserved') {
+          reservation = { outcome: 'reserved', request_status: 'reserved' };
+        } else {
+          return json(failure('QUOTA_RESERVATION_FAILED', 'Unable to reserve platform AI quota.'), 503, cors);
+        }
+      } catch {
+        return json(failure('QUOTA_RESERVATION_FAILED', 'Unable to reserve platform AI quota.'), 503, cors);
+      }
     }
   }
 
@@ -109,7 +114,7 @@ export async function handleRequest(request, env, dependencies = {}) {
   let outputChars = 0;
 
   try {
-    const processing = firstRpcRow(await supabaseRpc(env, 'mark_ai_request_processing', {
+    const processing = firstRpcRow(await supabaseRpc(env, 'mark_platform_ai_request_processing_v2', {
       p_request_id: requestId,
       p_user_id: userId
     }, fetchImpl));
@@ -134,7 +139,7 @@ export async function handleRequest(request, env, dependencies = {}) {
 
     let finalized;
     try {
-      finalized = firstRpcRow(await supabaseRpc(env, 'finalize_ai_request_success', {
+      finalized = firstRpcRow(await supabaseRpc(env, 'finalize_platform_ai_request_success_v2', {
         p_request_id: requestId,
         p_user_id: userId,
         p_schema_version: ANALYSIS_SCHEMA_VERSION,
@@ -143,18 +148,29 @@ export async function handleRequest(request, env, dependencies = {}) {
         p_provider_status: providerStatus
       }, fetchImpl));
     } catch {
-      const committed = await findAiRequest(env, requestId, fetchImpl);
-      if (committed?.user_id === userId && committed.status === 'success') {
-        finalized = {
-          outcome: 'already_success',
-          request_status: 'success',
-          consumed_quota_type: committed.quota_type
-        };
-      } else {
-        throw new AppError('QUOTA_FINALIZATION_FAILED', 'Unable to confirm quota consumption.', 503, {
-          providerStatus,
-          outputChars
-        });
+      try {
+        // Finalize is idempotent, so one retry safely retrieves the original
+        // period snapshot after a response-loss failure.
+        finalized = firstRpcRow(await supabaseRpc(env, 'finalize_platform_ai_request_success_v2', {
+          p_request_id: requestId,
+          p_user_id: userId,
+          p_schema_version: ANALYSIS_SCHEMA_VERSION,
+          p_output_chars: outputChars,
+          p_duration_ms: durationMs,
+          p_provider_status: providerStatus
+        }, fetchImpl));
+      } catch {
+        const committed = await findAiRequest(env, requestId, fetchImpl);
+        if (committed?.user_id === userId
+          && committed.quota_policy === 'daily_monthly_v2'
+          && committed.status === 'success') {
+          finalized = { outcome: 'already_success', request_status: 'success' };
+        } else {
+          throw new AppError('QUOTA_FINALIZATION_FAILED', 'Unable to confirm quota consumption.', 503, {
+            providerStatus,
+            outputChars
+          });
+        }
       }
     }
 
@@ -168,7 +184,7 @@ export async function handleRequest(request, env, dependencies = {}) {
     return json({
       success: true,
       report,
-      quotaType: finalized.consumed_quota_type || reservation.reserved_quota_type,
+      quotaType: 'daily_monthly_v2',
       model,
       requestId,
       quota: quotaForClient(hasQuotaSnapshot(finalized) ? finalized : reservation),
@@ -179,7 +195,7 @@ export async function handleRequest(request, env, dependencies = {}) {
     const durationMs = Date.now() - startedAt;
     let refund;
     try {
-      refund = firstRpcRow(await supabaseRpc(env, 'refund_ai_quota', {
+      refund = firstRpcRow(await supabaseRpc(env, 'refund_platform_ai_quota_v2', {
         p_request_id: requestId,
         p_user_id: userId,
         p_error_code: appError.code,
@@ -341,53 +357,11 @@ async function verifySupabaseToken(env, token, fetchImpl) {
 async function findAiRequest(env, requestId, fetchImpl) {
   const rows = await supabaseRest(
     env,
-    `/rest/v1/ai_requests?request_id=eq.${encodeURIComponent(requestId)}&select=request_id,user_id,status,quota_type`,
+    `/rest/v1/ai_requests?request_id=eq.${encodeURIComponent(requestId)}&select=request_id,user_id,status,quota_policy`,
     {},
     fetchImpl
   );
   return rows[0] || null;
-}
-
-function mapExistingRequest(existing, userId) {
-  if (!existing) return null;
-  if (existing.user_id !== userId) {
-    return { errorCode: 'INVALID_REQUEST_ID', message: 'requestId cannot be used for this account.', status: 409 };
-  }
-  if (existing.status === 'success') {
-    return { errorCode: 'REQUEST_ALREADY_COMPLETED', message: 'This request has already completed.', status: 409 };
-  }
-  if (['reserved', 'processing'].includes(existing.status)) {
-    return { errorCode: 'REQUEST_IN_PROGRESS', message: 'This request is already processing.', status: 409 };
-  }
-  return {
-    errorCode: 'REQUEST_ID_REQUIRES_RETRY',
-    message: 'Create a new requestId before retrying this failed request.',
-    status: 409
-  };
-}
-
-async function checkRateLimit(env, userId, fetchImpl) {
-  const now = Date.now();
-  const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
-  const minuteAgo = new Date(now - 60 * 1000).toISOString();
-  const safeUserId = encodeURIComponent(userId);
-
-  const daily = await supabaseRest(
-    env,
-    `/rest/v1/ai_requests?user_id=eq.${safeUserId}&status=eq.success&created_at=gte.${encodeURIComponent(dayAgo)}&select=id`,
-    {},
-    fetchImpl
-  );
-  if (daily.length >= 10) return 'Daily platform AI limit reached.';
-
-  const recent = await supabaseRest(
-    env,
-    `/rest/v1/ai_requests?user_id=eq.${safeUserId}&created_at=gte.${encodeURIComponent(minuteAgo)}&select=id`,
-    {},
-    fetchImpl
-  );
-  if (recent.length >= 2) return 'Requests are too frequent.';
-  return '';
 }
 
 async function supabaseRpc(env, functionName, body, fetchImpl) {
@@ -468,11 +442,13 @@ function firstRpcRow(rows) {
 
 function mapReservationOutcome(row) {
   const outcomes = {
-    no_quota: ['NO_QUOTA', 'No platform AI quota is available.', 402],
+    daily_limit_exhausted: ['DAILY_QUOTA_EXHAUSTED', 'Daily platform AI limit reached.', 429],
+    monthly_limit_exhausted: ['MONTHLY_QUOTA_EXHAUSTED', 'Monthly platform AI limit reached.', 429],
+    rate_limited: ['RATE_LIMITED', 'Requests are too frequent.', 429],
     already_completed: ['REQUEST_ALREADY_COMPLETED', 'This request has already completed.', 409],
     in_progress: ['REQUEST_IN_PROGRESS', 'This request is already processing.', 409],
     retry_with_new_request_id: ['REQUEST_ID_REQUIRES_RETRY', 'Create a new requestId before retrying.', 409],
-    request_id_conflict: ['INVALID_REQUEST_ID', 'requestId cannot be used for this account.', 409]
+    request_id_conflict: ['REQUEST_ID_CONFLICT', 'This requestId is unavailable. Create a new one.', 409]
   };
   if (row?.outcome === 'reserved') return null;
   const mapped = outcomes[row?.outcome] || ['QUOTA_RESERVATION_FAILED', 'Unable to reserve platform AI quota.', 503];
@@ -481,15 +457,23 @@ function mapReservationOutcome(row) {
 
 function quotaForClient(row = {}) {
   return {
-    platform_free_total: numberOrZero(row.platform_free_total),
-    platform_free_used: numberOrZero(row.platform_free_used),
-    platform_free_remaining: numberOrZero(row.platform_free_remaining),
-    platform_paid_credits: numberOrZero(row.platform_paid_credits)
+    daily: {
+      limit: numberOrZero(row.daily_limit),
+      successCount: numberOrZero(row.daily_success_count),
+      reservedCount: numberOrZero(row.daily_reserved_count),
+      remaining: numberOrZero(row.daily_remaining)
+    },
+    monthly: {
+      limit: numberOrZero(row.monthly_limit),
+      successCount: numberOrZero(row.monthly_success_count),
+      reservedCount: numberOrZero(row.monthly_reserved_count),
+      remaining: numberOrZero(row.monthly_remaining)
+    }
   };
 }
 
 function hasQuotaSnapshot(row = {}) {
-  return row.platform_free_total !== undefined && row.platform_free_used !== undefined;
+  return row.daily_limit !== undefined && row.monthly_limit !== undefined;
 }
 
 function numberOrZero(value) {

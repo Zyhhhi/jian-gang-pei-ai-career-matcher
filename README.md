@@ -4,7 +4,7 @@
 
 ## 当前产品状态
 
-- 当前阶段：8.6C-B，邮箱 OTP 登录前端实现。
+- 当前阶段：8.6C，登录策略、自带 Key 与平台 AI V2 额度代码已完成本地验证。
 - 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
 - 当前真实可用分析：本地规则 / Mock 分析。
 - 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
@@ -21,7 +21,7 @@
 
 ### 已登录用户
 
-- 平台 AI：目标规则为成功分析才计次，每日最多 5 次、每月最多 30 次，同时受两个上限约束。真实每日/月度计数与真实模型调用尚未完成。
+- 平台 AI：V2 后端代码的规则为成功分析才计次，按 Asia/Shanghai 自然日最多 5 次、自然月最多 30 次；每用户滚动 60 秒最多接受 2 次请求。V2 migration 尚未在真实 Supabase 执行，且前端开关关闭，因此这不是已开放的线上能力。
 - 自带 DeepSeek API Key：登录后可用，不占平台次数，费用由用户自己的 DeepSeek 账户承担。Key 默认仅保存在当前浏览器；开始分析前页面会明确提示已确认的简历和 JD 将直接发送给 DeepSeek，且不会经过 Worker、Supabase 或代理。
 
 收费、支付和订单方案已取消。历史数据库中的 `platform_paid_credits` 字段暂时保留以避免破坏既有数据和 migration，但已废弃：前端不展示、不读取、不依赖该字段。
@@ -56,6 +56,9 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 
 - Worker 后端验证 Supabase access token，不信任前端 userId。
 - 原子预留、成功确认、失败恢复、请求幂等和 stale 请求恢复。
+- V2 周期额度只由 service-role Worker RPC 处理：一次 reserve 在同一用户事务锁内完成陈旧预留恢复、60 秒防刷与日/月预留；失败/超时释放请求创建时的日/月预留，但仍保留该请求在 60 秒防刷窗口中。
+- 陈旧 `reserved` / `processing` 请求会在同一用户下一次 reserve 时自动恢复。TTL 为 5 分钟，长于 Worker 允许的最长 120 秒模型超时；完成或退款始终按请求记录的原始周期回写，跨日或跨月不改变归属。
+- `platform_paid_credits`、旧 `user_quota` 与旧 RPC 仍为兼容数据保留；V2 Worker 不读取、不扣减、不返回这些字段。
 - 严格结果 Schema、Prompt Injection 数据边界、输入长度限制和脱敏错误诊断。
 - Worker 仅在模型成功且结果通过验证后确认一次成功；失败不会计入成功分析次数。
 

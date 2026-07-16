@@ -21,7 +21,9 @@
 - 每月最多 30 次。
 - 每日和每月上限同时生效。
 
-当前 `ENABLE_PLATFORM_AI = false`。因此以上规则仅为已登录后的产品定义和页面展示，不代表真实调用、真实计数或真实限额已经开放。
+当前 `ENABLE_PLATFORM_AI = false`。V2 周期额度的 migration、service-role RPC 和 Worker 契约已在本地完成：数据库以自身 `now()` 的 Asia/Shanghai 自然日/月计算 5/30，并在同一用户事务锁内计算滚动 60 秒最多 2 次、预留、幂等和陈旧恢复。真实 Supabase 尚未执行 migration、真实 Worker 尚未部署，因此以上仍不代表线上真实调用、真实计数或真实限额已经开放。
+
+V2 的失败、超时和非法输出会释放请求创建时记录的日/月预留，已接受的失败请求仍进入滚动 60 秒防刷窗口。`reserved` / `processing` 的陈旧预留会在同一用户下一次 reserve 时自动恢复；TTL 为 5 分钟，长于 Worker 允许的最长 120 秒模型超时。旧 `user_quota`、`platform_paid_credits` 和旧 RPC 保留兼容，但 V2 Worker 不读取、扣减或返回它们。
 
 ## 自带 API Key 目标规则
 
