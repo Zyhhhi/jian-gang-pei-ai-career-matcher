@@ -19,7 +19,7 @@
 ## 文档状态
 
 - 正式产品方案见 `docs/product-plan-free-v1.md`。
-- 登录目标改为邮箱 6 位 OTP；当前实际代码仍为 Magic Link。
+- 登录目标改为邮箱 6 位 OTP；该阶段结束时的实际代码仍为 Magic Link。后续 8.6C-B 已实现 OTP 前端流程，记录见 `docs/release-0.8.6c-b.md`。
 - 历史 `platform_paid_credits` 字段保留并标记 deprecated；未执行任何数据库变更。
 - 8.6B/8.6C 后端安全能力继续保留，未开启真实平台 AI。
 

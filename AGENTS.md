@@ -1,6 +1,6 @@
 # 简岗配 AI｜项目规则
 
-## 当前产品定义：8.6C-A 免费方案
+## 当前产品定义：8.6C-B 免费方案与邮箱 OTP
 
 简岗配 AI 是面向应届生和初级岗位求职者的本地优先求职分析工具。
 
@@ -16,10 +16,12 @@
 ## 当前真实实现边界
 
 - `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 必须保持 `false`，不得公开打开。
-- 当前实际登录是邮箱 Magic Link；邮箱 6 位 OTP 是目标方案，尚未实现。不得把 Magic Link 说成 OTP。
+- 前端已实现邮箱 OTP 的发送与验证：`signInWithOtp({ email })` 后以 `verifyOtp({ email, token, type: 'email' })` 建立 session；不传 `emailRedirectTo`，不使用邮箱密码。
+- 真实 Supabase 邮件模板、邮件服务、OTP 过期时间、发送频率和真实收码登录均未在本阶段配置或验证。管理员只能按 `docs/supabase-email-otp-setup.md` 手动配置，不能把这些待办写成已完成。
+- 产品目标为 6 位验证码，但未读取真实后台配置；前端只接受数字而不固定长度。
 - 当前自带 API Key 仅支持浏览器本地保存、脱敏显示和清除；尚未接入真实模型调用，不得回退为 Mock 后伪装成真实 Key 分析。
 - 当前平台 AI 仍处于测试阶段；前端不得调用 Worker、DeepSeek 或真实 Supabase 额度 RPC。
-- 真实每日/月度计数、OTP 和平台 AI 端到端尚未实现，不得写成已完成。
+- 真实每日/月度计数、自带 API Key 调用、真实平台 AI 开放及真实 OTP 端到端验收尚未完成，不得写成已完成。
 
 ## 数据安全边界
 
@@ -44,4 +46,5 @@
 - 当前根目录没有 `package.json`，不要强行运行 `npm run build`。
 - Worker 改动至少运行 `node --test worker/tests/stage-8.6b-worker.test.mjs`。
 - 页面规则改动至少检查：未登录只能 Mock、非 Mock 不发 Worker、`ENABLE_PLATFORM_AI` 为 false、收费文案和付费埋点已移除、导入函数仍在。
+- OTP 改动至少运行 `node --test tests/otp-auth.contract.test.mjs`，检查不传 `emailRedirectTo`、OTP verify 参数、倒计时、session 恢复和退出后的门禁。
 - 未获明确授权时，不连接真实 Supabase、不执行 migration、不调用真实 DeepSeek、不部署 Worker、不 push。

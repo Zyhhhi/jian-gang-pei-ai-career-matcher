@@ -405,6 +405,13 @@ a { color: inherit; }
   gap: 10px;
   margin-top: 12px;
 }
+.otp-verify-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.otp-verify-panel[hidden] { display: none; }
+.otp-email-hint { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
 .manual-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -962,15 +969,27 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
           <p class="hint">未登录可继续使用本地演示。登录后可选择平台 AI 或自带 API Key；平台 AI 当前仍在测试，真实调用尚未开放。</p>
           <div class="auth-box">
             <div class="field">
-              <label for="loginEmailInput">邮箱登录</label>
-              <input id="loginEmailInput" type="email" autocomplete="email" placeholder="输入邮箱，发送登录邮件（当前为 Magic Link）">
+              <label for="loginEmailInput">邮箱登录 / 注册</label>
+              <input id="loginEmailInput" type="email" autocomplete="email" placeholder="输入邮箱，接收登录验证码">
             </div>
             <div class="auth-actions">
               <button class="secondary-btn" type="button" onclick="openLoginPanel()">打开登录区域</button>
-              <button class="primary-btn" type="button" onclick="sendLoginLink()">发送 Magic Link 登录邮件</button>
+              <button class="primary-btn" id="sendOtpButton" type="button" onclick="sendEmailOtp()">发送验证码</button>
               <button class="plain-btn" type="button" onclick="logoutUser()">退出登录</button>
             </div>
-            <div class="status" id="authStatus">当前实际登录方式为 Magic Link。邮箱 6 位验证码 OTP 为目标方案，尚未实现。</div>
+            <div class="otp-verify-panel" id="otpVerifyPanel" hidden>
+              <p class="otp-email-hint" id="otpEmailHint"></p>
+              <div class="field">
+                <label for="otpCodeInput">邮箱验证码</label>
+                <input id="otpCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" placeholder="输入邮件中的数字验证码" oninput="normalizeOtpCodeInput()">
+              </div>
+              <div class="auth-actions">
+                <button class="primary-btn" id="verifyOtpButton" type="button" onclick="verifyEmailOtp()">登录 / 注册</button>
+                <button class="secondary-btn" id="changeOtpEmailButton" type="button" onclick="changeOtpEmail()">更换邮箱</button>
+                <button class="plain-btn" id="resendOtpButton" type="button" onclick="resendEmailOtp()" disabled>重新发送验证码</button>
+              </div>
+            </div>
+            <div class="status" id="authStatus">输入邮箱后发送验证码；新邮箱会自动创建账号。当前不使用邮箱密码或邮件跳转链接。</div>
           </div>
         </section>
 
@@ -1138,6 +1157,15 @@ let hasTrackedStartAnalysis = false;
 let lastJdTrackAt = 0;
 let supabaseAuthClient = null;
 let currentAuthSession = null;
+const OTP_RESEND_SECONDS = 60;
+const otpLoginState = {
+  email: '',
+  stage: 'email',
+  resendRemaining: 0,
+  timerId: null,
+  isSending: false,
+  isVerifying: false
+};
 
 const $ = (id) => document.getElementById(id);
 const resumeInput = $('resumeInput');
@@ -1169,6 +1197,13 @@ const siteFeedbackContact = $('siteFeedbackContact');
 const aiModeStatus = $('aiModeStatus');
 const platformAiAccessStatus = $('platformAiAccessStatus');
 const loginEmailInput = $('loginEmailInput');
+const sendOtpButton = $('sendOtpButton');
+const otpVerifyPanel = $('otpVerifyPanel');
+const otpEmailHint = $('otpEmailHint');
+const otpCodeInput = $('otpCodeInput');
+const verifyOtpButton = $('verifyOtpButton');
+const changeOtpEmailButton = $('changeOtpEmailButton');
+const resendOtpButton = $('resendOtpButton');
 const authStatus = $('authStatus');
 const JOB_MANUAL_FIELDS = [
   ['companyName', 'jobCompanyName', '公司名'],
@@ -1646,26 +1681,22 @@ async function initAuthModule() {
   try {
     const client = await getSupabaseAuthClient();
     if (!client) return;
-    const { data } = await client.auth.getSession();
-    currentAuthSession = data?.session || null;
-    renderAuthState();
-    renderAiModeState();
-    renderPlatformAiAccessState();
+    const { data, error } = await client.auth.getSession();
+    if (error) throw error;
+    syncAuthSession(data?.session || null);
     client.auth.onAuthStateChange(async (event, session) => {
-      currentAuthSession = session || null;
-      renderAuthState();
-      renderAiModeState();
-      renderPlatformAiAccessState();
+      syncAuthSession(session || null);
       if (event === 'SIGNED_IN' && session) {
         trackEvent('login_success', { metadata: authEventMetadata('auth_state') });
       }
     });
   } catch (err) {
     if (authStatus) {
-      authStatus.textContent = `登录模块初始化失败：${err.message || '未知错误'}。当前可继续使用本地演示模式。`;
+      authStatus.textContent = '登录状态恢复失败，请刷新页面后重试。当前可继续使用本地演示模式。';
       authStatus.className = 'status error';
     }
   }
+  window.addEventListener('pagehide', clearOtpResendTimer, { once: true });
 }
 async function getSupabaseAuthClient() {
   if (!authConfigured()) return null;
@@ -1692,7 +1723,7 @@ function loadSupabaseSdk() {
 function openLoginPanel() {
   trackEvent('login_opened', { metadata: authEventMetadata('login_panel') });
   $('accountPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  loginEmailInput?.focus();
+  (otpLoginState.stage === 'verify' ? otpCodeInput : loginEmailInput)?.focus();
   if (!authConfigured() && authStatus) {
     authStatus.textContent = '登录功能尚未配置。当前可继续使用本地演示模式。';
     authStatus.className = 'status';
@@ -1701,30 +1732,147 @@ function openLoginPanel() {
 function goToLoginPanel() {
   openLoginPanel();
 }
-async function sendLoginLink() {
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+function clearOtpResendTimer() {
+  if (otpLoginState.timerId) window.clearInterval(otpLoginState.timerId);
+  otpLoginState.timerId = null;
+  otpLoginState.resendRemaining = 0;
+}
+function updateOtpLoginUi() {
+  const isVerifyStage = otpLoginState.stage === 'verify';
+  if (otpVerifyPanel) otpVerifyPanel.hidden = !isVerifyStage;
+  if (otpEmailHint) otpEmailHint.textContent = otpLoginState.email
+    ? `验证码已发送至 ${maskEmail(otpLoginState.email)}。请按邮件显示的位数输入。`
+    : '';
+  if (loginEmailInput) loginEmailInput.disabled = isVerifyStage || otpLoginState.isSending;
+  if (sendOtpButton) {
+    sendOtpButton.disabled = otpLoginState.isSending || isVerifyStage;
+    sendOtpButton.textContent = otpLoginState.isSending ? '发送中…' : '发送验证码';
+  }
+  if (verifyOtpButton) {
+    verifyOtpButton.disabled = otpLoginState.isVerifying;
+    verifyOtpButton.textContent = otpLoginState.isVerifying ? '验证中…' : '登录 / 注册';
+  }
+  if (changeOtpEmailButton) changeOtpEmailButton.disabled = otpLoginState.isVerifying;
+  if (resendOtpButton) {
+    resendOtpButton.disabled = otpLoginState.isSending || otpLoginState.isVerifying || otpLoginState.resendRemaining > 0;
+    resendOtpButton.textContent = otpLoginState.resendRemaining > 0
+      ? `重新发送（${otpLoginState.resendRemaining}秒）`
+      : '重新发送验证码';
+  }
+}
+function startOtpResendCountdown() {
+  clearOtpResendTimer();
+  otpLoginState.resendRemaining = OTP_RESEND_SECONDS;
+  updateOtpLoginUi();
+  otpLoginState.timerId = window.setInterval(() => {
+    otpLoginState.resendRemaining = Math.max(0, otpLoginState.resendRemaining - 1);
+    if (otpLoginState.resendRemaining === 0) clearOtpResendTimer();
+    updateOtpLoginUi();
+  }, 1000);
+}
+function resetOtpLoginState({ clearEmail = false } = {}) {
+  clearOtpResendTimer();
+  otpLoginState.email = '';
+  otpLoginState.stage = 'email';
+  otpLoginState.isSending = false;
+  otpLoginState.isVerifying = false;
+  if (otpCodeInput) otpCodeInput.value = '';
+  if (clearEmail && loginEmailInput) loginEmailInput.value = '';
+  updateOtpLoginUi();
+}
+function normalizeOtpCodeInput() {
+  if (!otpCodeInput) return;
+  otpCodeInput.value = otpCodeInput.value.replace(/\D/g, '');
+}
+function changeOtpEmail() {
+  resetOtpLoginState({ clearEmail: true });
+  setAuthMessage('已清空验证码，请输入新的邮箱。');
+  loginEmailInput?.focus();
+}
+function authErrorMessage(err, fallback) {
+  const detail = `${err?.code || ''} ${err?.message || ''}`.toLowerCase();
+  if (/rate|too many|over_email_send_rate_limit/.test(detail)) return '请求过于频繁，请稍后再试。';
+  if (/expired|expire/.test(detail)) return '验证码已过期，请重新发送。';
+  if (/invalid|otp|token|verification/.test(detail)) return '验证码错误，请检查后重试。';
+  if (/network|fetch|offline|timeout/.test(detail)) return '网络异常，请检查网络后重试。';
+  return fallback;
+}
+async function sendEmailOtp({ isResend = false } = {}) {
   openLoginPanel();
-  const email = loginEmailInput?.value.trim() || '';
+  const email = (isResend ? otpLoginState.email : loginEmailInput?.value.trim()) || '';
   if (!authConfigured()) {
     trackEvent('login_failed', { metadata: authEventMetadata('auth_not_configured') });
     setAuthMessage('登录功能尚未配置。当前可继续使用本地演示模式。', 'error');
     return;
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!isValidEmail(email)) {
     trackEvent('login_failed', { metadata: authEventMetadata('invalid_email') });
-    setAuthMessage('请填写有效邮箱，再发送登录邮件。', 'error');
+    setAuthMessage('请填写有效邮箱，再发送验证码。', 'error');
     return;
   }
+  if (otpLoginState.isSending || otpLoginState.resendRemaining > 0) return;
+  otpLoginState.isSending = true;
+  updateOtpLoginUi();
   try {
     const client = await getSupabaseAuthClient();
     const { error } = await client.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.href.split('#')[0] }
+      email
     });
     if (error) throw error;
-    setAuthMessage(`Magic Link 登录邮件已发送到 ${maskEmail(email)}，请在邮箱中确认。`, 'success');
+    otpLoginState.email = email;
+    otpLoginState.stage = 'verify';
+    if (otpCodeInput) otpCodeInput.value = '';
+    startOtpResendCountdown();
+    setAuthMessage(`验证码已发送到 ${maskEmail(email)}，请在下方输入验证码。`, 'success');
+    trackEvent('otp_code_sent', { metadata: authEventMetadata(isResend ? 'otp_resend' : 'otp_send') });
+    otpCodeInput?.focus();
   } catch (err) {
-    trackEvent('login_failed', { metadata: authEventMetadata('send_magic_link') });
-    setAuthMessage(`登录邮件发送失败：${err.message || '未知错误'}`, 'error');
+    trackEvent('login_failed', { metadata: authEventMetadata(isResend ? 'otp_resend' : 'otp_send') });
+    setAuthMessage(authErrorMessage(err, '验证码发送失败，请稍后重试。'), 'error');
+  } finally {
+    otpLoginState.isSending = false;
+    updateOtpLoginUi();
+  }
+}
+function resendEmailOtp() {
+  return sendEmailOtp({ isResend: true });
+}
+async function verifyEmailOtp() {
+  const email = otpLoginState.email;
+  normalizeOtpCodeInput();
+  const token = otpCodeInput?.value || '';
+  if (!email) {
+    setAuthMessage('请先输入邮箱并发送验证码。', 'error');
+    return;
+  }
+  if (!token) {
+    setAuthMessage('请输入邮箱中的验证码。', 'error');
+    return;
+  }
+  if (!/^\d+$/.test(token)) {
+    setAuthMessage('验证码只能包含数字。', 'error');
+    return;
+  }
+  if (otpLoginState.isVerifying) return;
+  otpLoginState.isVerifying = true;
+  updateOtpLoginUi();
+  try {
+    const client = await getSupabaseAuthClient();
+    const { data, error } = await client.auth.verifyOtp({ email, token, type: 'email' });
+    if (error) throw error;
+    if (!data?.session) throw new Error('session_missing');
+    syncAuthSession(data.session);
+    resetOtpLoginState({ clearEmail: true });
+    setAuthMessage('登录成功。平台 AI 当前仍在测试，自带 API Key 仍待接入。', 'success');
+  } catch (err) {
+    trackEvent('login_failed', { metadata: authEventMetadata('otp_verify') });
+    setAuthMessage(authErrorMessage(err, '验证码验证失败，请重新发送后再试。'), 'error');
+  } finally {
+    otpLoginState.isVerifying = false;
+    updateOtpLoginUi();
   }
 }
 async function logoutUser() {
@@ -1736,14 +1884,12 @@ async function logoutUser() {
     const client = await getSupabaseAuthClient();
     const { error } = await client.auth.signOut();
     if (error) throw error;
-    currentAuthSession = null;
-    renderAuthState();
-    renderAiModeState();
-    renderPlatformAiAccessState();
+    syncAuthSession(null);
+    resetOtpLoginState({ clearEmail: true });
     trackEvent('logout_success', { metadata: authEventMetadata('logout') });
     setAuthMessage('已退出登录。', 'success');
   } catch (err) {
-    setAuthMessage(`退出登录失败：${err.message || '未知错误'}`, 'error');
+    setAuthMessage('退出登录失败，请稍后重试。', 'error');
   }
 }
 function setAuthMessage(text, type = '') {
@@ -1753,6 +1899,7 @@ function setAuthMessage(text, type = '') {
 }
 function renderAuthState() {
   if (!authStatus) return;
+  updateOtpLoginUi();
   if (!authConfigured()) {
     authStatus.textContent = '登录功能尚未配置。当前可继续使用本地演示模式。';
     authStatus.className = 'status';
@@ -1763,6 +1910,12 @@ function renderAuthState() {
     ? `已登录：${maskEmail(email)}。可选择平台 AI 或自带 API Key；平台 AI 当前仍在测试。`
     : '未登录。仅可使用本地演示模式；登录后可选择平台 AI 或自带 API Key。';
   authStatus.className = `status ${email ? 'success' : ''}`.trim();
+}
+function syncAuthSession(session) {
+  currentAuthSession = session || null;
+  renderAuthState();
+  renderAiModeState();
+  renderPlatformAiAccessState();
 }
 function renderPlatformAiAccessState() {
   if (!platformAiAccessStatus) return;

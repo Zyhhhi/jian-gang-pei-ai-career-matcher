@@ -36,7 +36,9 @@
 
 目标方案为邮箱 6 位验证码 OTP，登录与注册合并，不使用邮箱密码。
 
-当前代码实际仍使用 Supabase `signInWithOtp` 的 Magic Link 邮件确认，尚未提供验证码输入或验证流程。本阶段不改该登录代码。
+8.6C-B 已实现前端发送与验证流程：`signInWithOtp({ email })` 发送邮件，`verifyOtp({ email, token, type: 'email' })` 建立 session。页面不传 `emailRedirectTo`、不要求邮件跳转、提供数字验证码输入、60 秒重发倒计时、更换邮箱、session 恢复和退出后的权限锁定。
+
+Supabase 官方产品文档将邮箱 OTP 描述为 6 位，但本阶段没有读取真实项目后台的模板和 OTP 配置；因此前端不固定验证码长度，只接受数字。真实邮件模板配置、真实收码、验证登录和 session 恢复仍待人工完成与验证，操作见 `docs/supabase-email-otp-setup.md`。
 
 ## 收费方案处置
 
