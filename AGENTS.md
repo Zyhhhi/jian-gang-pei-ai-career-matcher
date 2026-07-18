@@ -16,6 +16,7 @@
 ## 当前真实实现边界
 
 - `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 必须保持 `false`，不得公开打开。
+- Worker 的 `PLATFORM_AI_ENABLED` 是独立的服务端紧急熔断开关，缺失或除严格字符串 `true` 外的任何值均视为关闭。部署和受控验收前必须为 `false`；关闭时平台分析 POST 必须在 Supabase Auth、V2 RPC 和 DeepSeek 之前返回 `503 PLATFORM_AI_DISABLED`，但 OPTIONS/CORS 预检必须继续可用。
 - `SUPABASE_AUTH_CONFIG.LOGIN_MODE` 是登录模式唯一事实来源，当前必须为 `magic_link`。正式发布使用 `signInWithOtp({ email, options: { emailRedirectTo } })`；redirect 由当前 HTTP(S) 页面路径生成，不得硬编码本地地址。
 - `email_otp` 的发送、验证、倒计时与 Mock 测试必须继续保留，但默认隐藏且不得由普通用户触发。只有完成 SMTP 模板与真实验收后，才可将 `LOGIN_MODE` 改为 `email_otp`。
 - 真实 Supabase 邮件模板、邮件服务、OTP 过期时间、发送频率和真实收码登录均未在本阶段配置或验证。管理员只能按 `docs/supabase-email-otp-setup.md` 手动配置，不能把这些待办写成已完成。
@@ -24,7 +25,7 @@
 - 自带 Key 调用前必须同时满足：已登录、已保存有效 Key、已确认简历与 JD 将直接发送给 DeepSeek；失败不得回退 Mock，只有通过本地 JSON 结构校验后才可渲染并写入本地历史。
 - 已由本地浏览器探针确认 DeepSeek 直连 CORS 可用；GitHub Pages 正式域名仍须在发布前做一次独立 CORS 验收。若正式域名 CORS 失败，停止该功能发布，不得引入代理。
 - 当前平台 AI 仍处于测试阶段；前端不得调用 Worker、DeepSeek 或真实 Supabase 额度 RPC。
-- 真实每日/月度计数、真实平台 AI 开放及真实 OTP 端到端验收尚未完成，不得写成已完成。
+- V2 migration、V2 RPC、RLS 和数据库最小权限已在真实 Supabase 人工验收；Worker 尚未部署，真实每日/月度平台 AI 调用、平台 AI 开放及真实 OTP 端到端验收尚未完成，不得写成已完成。
 
 ## 数据安全边界
 

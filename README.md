@@ -4,7 +4,7 @@
 
 ## 当前产品状态
 
-- 当前阶段：8.6C，登录策略、自带 Key 与平台 AI V2 额度代码已完成本地验证。
+- 当前阶段：8.6C，登录策略、自带 Key 与平台 AI V2 额度代码已完成本地验证；V2 migration 和数据库最小权限已在真实 Supabase 人工验收。
 - 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
 - 当前真实可用分析：本地规则 / Mock 分析。
 - 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
@@ -21,7 +21,7 @@
 
 ### 已登录用户
 
-- 平台 AI：V2 后端代码的规则为成功分析才计次，按 Asia/Shanghai 自然日最多 5 次、自然月最多 30 次；每用户滚动 60 秒最多接受 2 次请求。V2 migration 尚未在真实 Supabase 执行，且前端开关关闭，因此这不是已开放的线上能力。
+- 平台 AI：V2 后端规则为成功分析才计次，按 Asia/Shanghai 自然日最多 5 次、自然月最多 30 次；每用户滚动 60 秒最多接受 2 次请求。V2 migration 和数据库权限已在真实 Supabase 人工验收，但 Worker 尚未部署，前端与 Worker 服务端开关均保持关闭，因此这不是已开放的线上能力。
 - 自带 DeepSeek API Key：登录后可用，不占平台次数，费用由用户自己的 DeepSeek 账户承担。Key 默认仅保存在当前浏览器；开始分析前页面会明确提示已确认的简历和 JD 将直接发送给 DeepSeek，且不会经过 Worker、Supabase 或代理。
 
 收费、支付和订单方案已取消。历史数据库中的 `platform_paid_credits` 字段暂时保留以避免破坏既有数据和 migration，但已废弃：前端不展示、不读取、不依赖该字段。

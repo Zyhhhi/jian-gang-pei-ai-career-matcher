@@ -14,6 +14,7 @@ const ENV = {
   DEEPSEEK_API_KEY: 'test-only-placeholder',
   SUPABASE_URL: 'https://example.supabase.co',
   SUPABASE_SERVICE_ROLE_KEY: 'test-only-placeholder',
+  PLATFORM_AI_ENABLED: 'true',
   ALLOWED_ORIGIN: 'http://127.0.0.1:4178',
   DEEPSEEK_MODEL: MODEL,
   MODEL_TIMEOUT_MS: '15'
@@ -245,6 +246,52 @@ test('DeepSeek request and sanitized Supabase diagnostics retain their security 
   assert.equal(headers.Authorization, undefined);
   const diagnostic = worker.buildSupabaseFailureDiagnostic('/rest/v1/rpc/reserve_platform_ai_quota_v2?private=x', 400, JSON.stringify({ message: 'private@example.com sb_secret_hidden sk-hidden' }));
   assert.doesNotMatch(JSON.stringify(diagnostic), /private@example\.com|sb_secret_hidden|sk-hidden/);
+});
+
+test('server kill switch is closed by default and explicit false prevents every external request', async () => {
+  for (const env of [
+    Object.fromEntries(Object.entries(ENV).filter(([name]) => name !== 'PLATFORM_AI_ENABLED')),
+    { ...ENV, PLATFORM_AI_ENABLED: 'false' },
+    { ...ENV, PLATFORM_AI_ENABLED: 'TRUE' }
+  ]) {
+    let fetchCalls = 0;
+    const response = await worker.handleRequest(makeRequest(validPayload('request-kill-switch-closed')), env, {
+      fetchImpl: async () => { fetchCalls += 1; throw new Error('external fetch must not run while disabled'); }
+    });
+    const result = await body(response);
+    assert.equal(response.status, 503);
+    assert.equal(result.errorCode, 'PLATFORM_AI_DISABLED');
+    assert.match(result.message, /平台 AI 当前未开放/);
+    assert.equal(fetchCalls, 0);
+  }
+});
+
+test('OPTIONS remains available while the server kill switch is closed', async () => {
+  let fetchCalls = 0;
+  const request = new Request('https://worker.example/api/platform-analyze', {
+    method: 'OPTIONS',
+    headers: { Origin: ENV.ALLOWED_ORIGIN }
+  });
+  const response = await worker.handleRequest(request, { ...ENV, PLATFORM_AI_ENABLED: 'false' }, {
+    fetchImpl: async () => { fetchCalls += 1; throw new Error('OPTIONS must not fetch'); }
+  });
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get('Access-Control-Allow-Origin'), ENV.ALLOWED_ORIGIN);
+  assert.equal(fetchCalls, 0);
+});
+
+test('an enabled server kill switch proceeds to the existing Supabase authentication flow', async () => {
+  let fetchCalls = 0;
+  const response = await worker.handleRequest(makeRequest(validPayload('request-kill-switch-enabled'), 'invalid-token'), ENV, {
+    fetchImpl: async (url) => {
+      fetchCalls += 1;
+      assert.equal(String(url), 'https://example.supabase.co/auth/v1/user');
+      return new Response(JSON.stringify({ message: 'invalid token' }), { status: 401 });
+    }
+  });
+  assert.equal(response.status, 401);
+  assert.equal((await body(response)).errorCode, 'INVALID_TOKEN');
+  assert.equal(fetchCalls, 1);
 });
 
 test('input validation still rejects unauthenticated, malformed and invalid platform requests', async () => {

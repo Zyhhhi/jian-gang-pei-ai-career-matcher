@@ -32,6 +32,9 @@ export async function handleRequest(request, env, dependencies = {}) {
   if (request.method !== 'POST') {
     return json(failure('METHOD_NOT_ALLOWED', 'Only POST is allowed.'), 405, cors);
   }
+  if (!isPlatformAiEnabled(env)) {
+    return json(failure('PLATFORM_AI_DISABLED', '平台 AI 当前未开放，请使用本地 Mock 或自带 API Key。'), 503, cors);
+  }
   if (!isJsonContentType(request.headers.get('Content-Type'))) {
     return json(failure('INVALID_CONTENT_TYPE', 'Content-Type must be application/json.'), 415, cors);
   }
@@ -285,6 +288,10 @@ function invalid(errorCode, message, status = 400) {
 
 function hasRequiredEnvironment(env) {
   return Boolean(env?.DEEPSEEK_API_KEY && env?.SUPABASE_URL && env?.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function isPlatformAiEnabled(env) {
+  return env?.PLATFORM_AI_ENABLED === 'true';
 }
 
 function isJsonContentType(contentType) {
