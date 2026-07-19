@@ -78,7 +78,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - `docs/product-plan-free-v1.md`：免费产品正式方案与未完成项。
 - `docs/release-0.8.6c-a.md`：8.6C-A 页面和规则重置记录。
 - `docs/release-0.8.6c-b.md`：8.6C-B OTP 前端实现与验证边界。
-- `docs/release-platform-ai-production-wiring-20260719.md`：正式 Worker 前端接线与关闭状态记录。
+- `docs/release-0.8.6c-f.md`：v0.8.6C-F 发布范围、正式 Worker 接线与关闭状态记录。
 - `docs/supabase-email-otp-setup.md`：仅供管理员执行的 Supabase 邮件模板配置说明。
 - `docs/migrations/`：既有 Supabase schema 与 8.6B/8.6C 安全 migration；不得由前端执行。
 
