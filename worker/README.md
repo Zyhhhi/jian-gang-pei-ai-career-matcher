@@ -1,8 +1,20 @@
 # 简岗配 AI Worker
 
-阶段 8 的 Cloudflare Worker 只服务平台 AI 模式：
+阶段 8 的 Cloudflare Worker 只为后续平台 AI 模式保留安全调用链：
 
-前端携带 Supabase access token、`requestId`、`resumeProfile` 和 `jobDraft` 调用 Worker；Worker 校验登录、额度、限流和重复请求后调用 DeepSeek。只有 DeepSeek 成功返回且 JSON 解析成功后，Worker 才扣减平台 AI 额度。
+若后续受控启用，前端会携带 Supabase access token、`requestId`、`analysisMode`、`resumeProfile` 和 `jobDraft` 调用 Worker。Worker 通过原子 V2 RPC 先预留可用次数，再调用 DeepSeek；成功输出通过 Schema 1.0 校验后确认，失败、超时或无效输出通过 RPC 恢复预留。当前公开页面的 `ENABLE_PLATFORM_AI = false`，且 Worker 服务端熔断开关默认关闭，不会调用该 Worker。
+
+## 当前生产状态
+
+- 正式 Worker 名称：`jian-gang-pei-platform-ai`
+- 正式接口：`https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`
+- 实际部署入口：`worker/index.js`；根目录 `cloudflare-worker.js` 仅为历史禁用入口
+- 前端 `ENABLE_PLATFORM_AI=false`，Worker `PLATFORM_AI_ENABLED=false`，平台 AI 尚未公开开放
+- 已配置 Secret 名称：`DEEPSEEK_API_KEY`、`SUPABASE_SERVICE_ROLE_KEY`；不得记录或输出值
+- V2 migration 已在真实 Supabase 执行一次并完成函数、RLS 与最小权限验收，不得重复执行
+- 已完成一次受控真实后端调用；Worker、DeepSeek 与 V2 日/月计数链路成功，随后服务端开关已恢复为 `false`
+
+本地 `worker/wrangler.toml` 被 `.gitignore` 忽略。任何再次部署前都必须先确认该文件不会覆盖 Dashboard 中已验证的 CORS Origin 配置。
 
 ## 环境变量
 
@@ -12,11 +24,15 @@
 
 - `DEEPSEEK_API_KEY`：DeepSeek API Key，必须用 Worker secret 保存
 - `SUPABASE_URL`：Supabase 项目 URL
-- `SUPABASE_SERVICE_ROLE_KEY`：Supabase service role key，必须用 Worker secret 保存
+- `SUPABASE_SERVICE_ROLE_KEY`：推荐填写 Supabase 新版 `sb_secret_...` Secret key；也兼容旧版 service role key，必须用 Worker secret 保存
 - `ALLOWED_ORIGIN`：允许访问 Worker 的前端域名，例如 GitHub Pages 域名
+- `PLATFORM_AI_ENABLED`：普通 Worker 配置，严格为字符串 `true` 时才允许分析 POST；缺失、`false` 或任何其他值都会返回 `503 PLATFORM_AI_DISABLED`，并且不访问 Supabase 或 DeepSeek。部署和受控验收前必须保持 `false`。
 - `DEEPSEEK_MODEL`：默认 `deepseek-v4-pro`
+- `MODEL_TIMEOUT_MS`：可选，默认 `60000`，允许范围 10 到 120000 毫秒
 
 `SUPABASE_SERVICE_ROLE_KEY` 只能放在 Worker 环境变量中，不能放到前端。
+
+`DEEPSEEK_API_KEY`、`SUPABASE_SERVICE_ROLE_KEY` 是 secrets；`SUPABASE_URL`、`ALLOWED_ORIGIN`、`PLATFORM_AI_ENABLED`、`DEEPSEEK_MODEL` 和 `MODEL_TIMEOUT_MS` 是普通配置。`ALLOWED_ORIGIN` 可用英文逗号列出精确 Origin，例如 `https://zyhhhi.github.io,http://127.0.0.1:4178`；不得包含路径、通配符或未核验的域名。
 
 ## 部署步骤
 
@@ -39,7 +55,7 @@ cd worker
 copy wrangler.toml.example wrangler.toml
 ```
 
-4. 修改 `wrangler.toml` 中的 `SUPABASE_URL`、`ALLOWED_ORIGIN`、`DEEPSEEK_MODEL` 示例值。
+4. 修改 `wrangler.toml` 中的 `SUPABASE_URL`、`ALLOWED_ORIGIN`、`DEEPSEEK_MODEL` 示例值，并确认 `PLATFORM_AI_ENABLED = "false"`。
 
 5. 配置 secrets：
 
@@ -54,41 +70,50 @@ wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 wrangler dev
 ```
 
-7. 部署：
+7. 当前项目的 V2 migration 和数据库最小权限已在真实 Supabase 人工验收。部署前只复查五个 V2 RPC 仍为 `SECURITY DEFINER`、仅 `service_role` 有 EXECUTE，且 `platform_ai_quota_periods` 没有直接表级权限；不要重复执行 V2 migration。
+
+8. 部署 Worker：
 
 ```bash
 wrangler deploy
 ```
 
-8. 将部署后的 Worker 地址填入前端 `PLATFORM_AI_CONFIG.PLATFORM_WORKER_URL`，并把 `ENABLE_PLATFORM_AI` 改为 `true`。
+9. 前端 `PLATFORM_AI_CONFIG.PLATFORM_WORKER_BASE_URL` 已接线正式 Worker。再次部署或变更配置后，继续保持 `ENABLE_PLATFORM_AI = false` 和 `PLATFORM_AI_ENABLED = "false"`，先完成关闭状态与 CORS 健康检查。是否公开开放平台 AI 必须另行明确决定。
 
 ## Supabase 表
 
-部署前先执行：
+`user_quota` 是历史可用次数兼容表；其中旧的 `platform_paid_credits` 字段已废弃，前端不展示、不读取、不依赖。正式规则由已人工验收的 V2 migration 实现：每日 5 次、每月 30 次、滚动 60 秒最多 2 次。`ai_requests` 用于 requestId 幂等、状态审计和限流；`platform_ai_quota_periods` 保存按 Asia/Shanghai 自然日/月的 V2 计数。V2 仅允许 service role 调用以下 RPC：
 
-- `docs/supabase_auth_quota.sql`
-- `docs/supabase_ai_requests.sql`
+- `reserve_platform_ai_quota_v2`
+- `mark_platform_ai_request_processing_v2`
+- `finalize_platform_ai_request_success_v2`
+- `refund_platform_ai_quota_v2`
+- `recover_stale_platform_ai_request_v2`
 
-`user_quota` 用于保存免费额度和付费额度。`ai_requests` 用于防止同一 `requestId` 重复扣费，并记录处理状态、模型、输入输出长度和错误码。
+浏览器角色和 `PUBLIC` 没有这些 RPC 的执行权限。Worker 不用普通 REST PATCH 直接扣减额度，直接表级权限只保留为实现所必需的最小范围。
 
 ## 安全边界
 
 - 前端不能直接调用 DeepSeek。
 - 前端不能保存或展示 DeepSeek API Key。
 - Worker 不把简历原文、完整 JD、API Key 写入 `usage_events`。
-- 额度不足、登录失败、输入过长、重复请求、限流和 DeepSeek 失败都不扣次数。
-- DeepSeek 成功返回且 JSON 解析成功后才扣减额度。
+- 可用次数不足、登录失败、输入过长、重复请求和限流不会调用模型。
+- Provider 失败、超时、空内容、非 JSON 和 Schema 失败会恢复已预留次数。
+- 成功结果必须通过 Schema 1.0 的必填字段、类型、枚举、分数、requestId 和证据校验。
+- 简历与 JD 被包裹在明确的数据边界内，内容中的指令不会被视为系统指令。
+- `PLATFORM_AI_ENABLED` 缺失或未严格设为 `true` 时，POST 在认证、额度 RPC 与模型调用之前返回 `503 PLATFORM_AI_DISABLED`；OPTIONS 仍可用于 CORS 健康检查。
 
 ## 当前限制
 
-- IP 限流目前作为预留说明。当前 Worker 使用 `ai_requests` 做用户级限流：同一用户 24 小时最多 10 次成功生成，同一用户 1 分钟最多 2 次请求。持久化 IP 限流建议后续使用 Durable Objects、WAF 或在 `ai_requests` 增加 `ip_hash` 字段。
-- 支付和增加 `platform_paid_credits` 不在阶段 8 实现。
+- IP 限流目前作为预留说明。当前 V2 RPC 使用 `ai_requests` 做用户级限流：同一用户按 Asia/Shanghai 自然日最多 5 次成功生成、自然月最多 30 次、滚动 60 秒最多 2 次请求。持久化 IP 限流建议后续使用 Durable Objects、WAF 或在 `ai_requests` 增加 `ip_hash` 字段。
+- 商业化入口已取消；`platform_paid_credits` 仅为数据库兼容字段，不得新增前端依赖。
+- 自动化测试仍只使用 Mock Supabase RPC 和 Mock Provider，不连接真实服务。V2 数据库对象与权限已人工验收，生产 Worker 也已完成一次受控真实后端调用；公开发布路径与开关启用仍待单独授权和最终线上验收。
 
 ## JSON 解析失败策略
 
 Worker 会先尝试解析模型返回的 JSON；如果模型包裹了 Markdown code fence 或在 JSON 前后混入少量文本，Worker 会尝试提取第一个 `{` 到最后一个 `}` 之间的 JSON。
 
-如果仍然解析失败，Worker 返回 `DEEPSEEK_PARSE_FAILED`，把 `ai_requests.status` 更新为 `failed`，把 `ai_requests.error_code` 记录为 `PARSE_FAILED`，并且不扣减用户额度。不要把模型完整原始返回写入 `usage_events` 或 `ai_requests`。
+如果解析或 Schema 校验失败，Worker 返回 `INVALID_MODEL_OUTPUT`，并通过 `refund_platform_ai_quota_v2` 将请求从失败状态转换为 `refunded`。模型完整原始返回不会写入 `usage_events` 或 `ai_requests`。
 ## DeepSeek 输出参数
 
-Worker 使用 `DEEPSEEK_MODEL`，默认 `deepseek-v4-pro`。请求中使用 DeepSeek 官方 Chat Completions 的 `response_format: { type: "json_object" }` 约束 JSON 输出，并启用 `thinking: { type: "enabled", reasoning_effort: "high" }`。如果后续 DeepSeek 模型参数发生变化，应先查官方文档再修改，不要凭记忆添加未知字段。
+Worker 使用 `DEEPSEEK_MODEL`，默认 `deepseek-v4-pro`。请求使用 `response_format: { type: "json_object" }`、`thinking: { type: "enabled" }` 和顶层 `reasoning_effort: "high"`。thinking mode 下未发送官方说明会被忽略的 `temperature`。请求由 `AbortController` 在约 60 秒后中止，本阶段不自动重试，避免重复模型费用。

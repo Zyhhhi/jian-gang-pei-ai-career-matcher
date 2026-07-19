@@ -35,3 +35,9 @@ using (auth.uid() = user_id);
 -- DEEPSEEK_PARSE_FAILED to the frontend, records ai_requests.status = failed,
 -- records ai_requests.error_code = PARSE_FAILED, and does not deduct quota.
 -- Do not store the full raw model response in usage_events or ai_requests.
+
+-- Stage 8.6B upgrade:
+-- After creating this base table, run:
+-- docs/migrations/20260714_stage_8_6b_atomic_ai_quota.sql
+-- That migration retains existing rows and adds the reserved/processing/success/
+-- failed/refunded state machine plus service-role-only atomic quota RPCs.
