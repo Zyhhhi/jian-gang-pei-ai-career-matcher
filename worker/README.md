@@ -4,6 +4,18 @@
 
 若后续受控启用，前端会携带 Supabase access token、`requestId`、`analysisMode`、`resumeProfile` 和 `jobDraft` 调用 Worker。Worker 通过原子 V2 RPC 先预留可用次数，再调用 DeepSeek；成功输出通过 Schema 1.0 校验后确认，失败、超时或无效输出通过 RPC 恢复预留。当前公开页面的 `ENABLE_PLATFORM_AI = false`，且 Worker 服务端熔断开关默认关闭，不会调用该 Worker。
 
+## 当前生产状态
+
+- 正式 Worker 名称：`jian-gang-pei-platform-ai`
+- 正式接口：`https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`
+- 实际部署入口：`worker/index.js`；根目录 `cloudflare-worker.js` 仅为历史禁用入口
+- 前端 `ENABLE_PLATFORM_AI=false`，Worker `PLATFORM_AI_ENABLED=false`，平台 AI 尚未公开开放
+- 已配置 Secret 名称：`DEEPSEEK_API_KEY`、`SUPABASE_SERVICE_ROLE_KEY`；不得记录或输出值
+- V2 migration 已在真实 Supabase 执行一次并完成函数、RLS 与最小权限验收，不得重复执行
+- 已完成一次受控真实后端调用；Worker、DeepSeek 与 V2 日/月计数链路成功，随后服务端开关已恢复为 `false`
+
+本地 `worker/wrangler.toml` 被 `.gitignore` 忽略。任何再次部署前都必须先确认该文件不会覆盖 Dashboard 中已验证的 CORS Origin 配置。
+
 ## 环境变量
 
 不要在代码、README、GitHub 或前端写真实密钥。
@@ -66,7 +78,7 @@ wrangler dev
 wrangler deploy
 ```
 
-9. 将部署后的 Worker 地址填入前端 `PLATFORM_AI_CONFIG.PLATFORM_WORKER_BASE_URL`。继续保持 `ENABLE_PLATFORM_AI = false` 和 `PLATFORM_AI_ENABLED = "false"`；先用 OPTIONS 和无 Token POST 完成部署后健康检查。只有受控真实端到端验收通过后才评估分别开启服务端和前端开关。
+9. 前端 `PLATFORM_AI_CONFIG.PLATFORM_WORKER_BASE_URL` 已接线正式 Worker。再次部署或变更配置后，继续保持 `ENABLE_PLATFORM_AI = false` 和 `PLATFORM_AI_ENABLED = "false"`，先完成关闭状态与 CORS 健康检查。是否公开开放平台 AI 必须另行明确决定。
 
 ## Supabase 表
 
@@ -95,7 +107,7 @@ wrangler deploy
 
 - IP 限流目前作为预留说明。当前 V2 RPC 使用 `ai_requests` 做用户级限流：同一用户按 Asia/Shanghai 自然日最多 5 次成功生成、自然月最多 30 次、滚动 60 秒最多 2 次请求。持久化 IP 限流建议后续使用 Durable Objects、WAF 或在 `ai_requests` 增加 `ip_hash` 字段。
 - 商业化入口已取消；`platform_paid_credits` 仅为数据库兼容字段，不得新增前端依赖。
-- 当前自动化仅使用 Mock Supabase RPC 和 Mock Provider。V2 数据库对象与权限已人工验收；真实 JWT、真实 DeepSeek 与生产 Worker 尚待受控验收。
+- 自动化测试仍只使用 Mock Supabase RPC 和 Mock Provider，不连接真实服务。V2 数据库对象与权限已人工验收，生产 Worker 也已完成一次受控真实后端调用；公开发布路径与开关启用仍待单独授权和最终线上验收。
 
 ## JSON 解析失败策略
 

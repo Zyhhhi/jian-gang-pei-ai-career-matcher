@@ -4,12 +4,12 @@
 
 ## 当前产品状态
 
-- 当前阶段：8.6C，登录策略、自带 Key 与平台 AI V2 额度代码已完成本地验证；V2 migration 和数据库最小权限已在真实 Supabase 人工验收。
+- 当前阶段：登录策略、自带 Key、平台 AI V2 额度和正式 Worker 后端闭环均已完成对应验证；平台 AI 尚未公开开放。
 - 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
-- 当前真实可用分析：本地规则 / Mock 分析。
+- 当前真实可用分析：本地规则 / Mock 分析，以及登录后的自带 DeepSeek Key 浏览器直连分析。
 - 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
 - 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；平台 AI 仍未开放。
-- 当前平台 AI：仅登录后可选择和查看规则；仍在测试，不会调用 Worker、DeepSeek 或真实后端。
+- 当前平台 AI：前端已接线正式 Worker，但前端 `ENABLE_PLATFORM_AI=false`、Worker `PLATFORM_AI_ENABLED=false`，公开页面不会调用平台 Worker、DeepSeek 或真实额度 RPC。
 
 本地演示模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。
 
@@ -21,7 +21,7 @@
 
 ### 已登录用户
 
-- 平台 AI：V2 后端规则为成功分析才计次，按 Asia/Shanghai 自然日最多 5 次、自然月最多 30 次；每用户滚动 60 秒最多接受 2 次请求。V2 migration 和数据库权限已在真实 Supabase 人工验收，但 Worker 尚未部署，前端与 Worker 服务端开关均保持关闭，因此这不是已开放的线上能力。
+- 平台 AI：V2 后端规则为成功分析才计次，按 Asia/Shanghai 自然日最多 5 次、自然月最多 30 次；每用户滚动 60 秒最多接受 2 次请求。V2 migration 已在真实 Supabase 执行一次并完成函数、RLS 与最小权限验收；正式 Worker 已部署并完成一次受控真实后端调用。验收后服务端开关已恢复 `false`，前端开关也保持 `false`，因此这不是已开放的线上能力。
 - 自带 DeepSeek API Key：登录后可用，不占平台次数，费用由用户自己的 DeepSeek 账户承担。Key 默认仅保存在当前浏览器；开始分析前页面会明确提示已确认的简历和 JD 将直接发送给 DeepSeek，且不会经过 Worker、Supabase 或代理。
 
 收费、支付和订单方案已取消。历史数据库中的 `platform_paid_credits` 字段暂时保留以避免破坏既有数据和 migration，但已废弃：前端不展示、不读取、不依赖该字段。
@@ -59,6 +59,8 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 
 8.6B/8.6C 已保留以下后端安全能力，后续开放平台 AI 时继续使用：
 
+- 正式 Worker：`jian-gang-pei-platform-ai`，接口为 `https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`；实际入口为 `worker/index.js`。
+- Worker 已配置 `DEEPSEEK_API_KEY` 和 `SUPABASE_SERVICE_ROLE_KEY` 两个 Secret；仓库只记录名称，不保存或展示值。
 - Worker 后端验证 Supabase access token，不信任前端 userId。
 - 原子预留、成功确认、失败恢复、请求幂等和 stale 请求恢复。
 - V2 周期额度只由 service-role Worker RPC 处理：一次 reserve 在同一用户事务锁内完成陈旧预留恢复、60 秒防刷与日/月预留；失败/超时释放请求创建时的日/月预留，但仍保留该请求在 60 秒防刷窗口中。
@@ -67,7 +69,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - 严格结果 Schema、Prompt Injection 数据边界、输入长度限制和脱敏错误诊断。
 - Worker 仅在模型成功且结果通过验证后确认一次成功；失败不会计入成功分析次数。
 
-当前项目不会自动执行 Supabase migration、部署 Worker 或写入真实密钥。
+当前本地检查不会连接真实 Supabase、重复执行 migration、调用真实 DeepSeek、修改 Worker 配置或写入真实密钥。任何再次部署前都必须单独确认，并检查被忽略的 `worker/wrangler.toml` 不会覆盖生产 CORS 配置。
 
 ## 文件说明
 
@@ -76,6 +78,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - `docs/product-plan-free-v1.md`：免费产品正式方案与未完成项。
 - `docs/release-0.8.6c-a.md`：8.6C-A 页面和规则重置记录。
 - `docs/release-0.8.6c-b.md`：8.6C-B OTP 前端实现与验证边界。
+- `docs/release-platform-ai-production-wiring-20260719.md`：正式 Worker 前端接线与关闭状态记录。
 - `docs/supabase-email-otp-setup.md`：仅供管理员执行的 Supabase 邮件模板配置说明。
 - `docs/migrations/`：既有 Supabase schema 与 8.6B/8.6C 安全 migration；不得由前端执行。
 
@@ -111,6 +114,12 @@ node --test tests/own-api-direct.contract.test.mjs
 
 ```powershell
 node --test tests/local-data-isolation.contract.test.mjs
+```
+
+平台 AI 前端配置契约测试：
+
+```powershell
+node --test tests/platform-ai-config.contract.test.mjs
 ```
 
 不要在本地检查中连接真实 Supabase、调用真实 DeepSeek、执行 migration 或部署 Worker。

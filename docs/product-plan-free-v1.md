@@ -2,14 +2,14 @@
 
 ## 目标
 
-将产品从收费额度方案调整为免费、登录后分层使用的求职分析体验。该方案只定义产品规则；不会在本阶段连接真实 Supabase、执行 migration、部署 Worker 或调用真实 DeepSeek。
+将产品从收费额度方案调整为免费、登录后分层使用的求职分析体验。当前实现已完成自带 DeepSeek Key 浏览器直连、V2 额度数据库验收和正式 Worker 后端受控验收；平台 AI 的前端与服务端开关仍保持关闭，尚未公开开放。
 
 ## 用户权限
 
 | 用户状态 | 可用能力 | 不可用能力 |
 | --- | --- | --- |
 | 未登录 | 本地 Mock 演示、简历本地导入、JD 本地输入、本地历史记录 | 平台 AI、自带 API Key |
-| 已登录 | Mock、平台 AI（测试中）、自带 DeepSeek API Key 直连 | 未实现的真实 OTP、每日/月度真实计数、真实平台 AI 调用 |
+| 已登录 | Mock、自带 DeepSeek API Key 直连、查看平台 AI 规则 | 未公开开放的平台 AI、尚未启用的真实 OTP |
 
 未登录时，平台 AI 和自带 API Key 模式必须锁定；点击引导登录，且不发送 Worker 请求。Mock 模式必须标明：结果由本地规则生成，不调用真实大模型。
 
@@ -21,7 +21,9 @@
 - 每月最多 30 次。
 - 每日和每月上限同时生效。
 
-当前 `ENABLE_PLATFORM_AI = false`。V2 周期额度的 migration、service-role RPC 和 Worker 契约已完成；真实 Supabase 已人工执行 V2 migration，并验收 V2 函数、RLS 与最小表级权限。数据库以自身 `now()` 的 Asia/Shanghai 自然日/月计算 5/30，并在同一用户事务锁内计算滚动 60 秒最多 2 次、预留、幂等和陈旧恢复。真实 Worker 尚未部署，且 Worker 服务端开关默认关闭，因此以上仍不代表线上真实调用、真实计数或真实限额已经开放。
+当前 `ENABLE_PLATFORM_AI = false`。V2 周期额度的 migration 已在真实 Supabase 执行一次，service-role RPC、函数 owner、`SECURITY DEFINER`、`search_path`、RLS 与最小权限均已人工验收。数据库以自身 `now()` 的 Asia/Shanghai 自然日/月计算 5/30，并在同一用户事务锁内计算滚动 60 秒最多 2 次、预留、幂等和陈旧恢复。
+
+正式 Worker `jian-gang-pei-platform-ai` 已部署，正式接口为 `https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`，实际入口为 `worker/index.js`。生产环境已配置名为 `DEEPSEEK_API_KEY` 和 `SUPABASE_SERVICE_ROLE_KEY` 的两个 Secret，文档和仓库不得记录其值。一次受控真实后端调用已成功完成 Worker、DeepSeek 与 V2 日/月计数闭环；之后 `PLATFORM_AI_ENABLED` 已恢复为 `false`。前端只完成正式地址接线，`ENABLE_PLATFORM_AI` 也保持 `false`，因此平台 AI 仍未公开开放。
 
 V2 的失败、超时和非法输出会释放请求创建时记录的日/月预留，已接受的失败请求仍进入滚动 60 秒防刷窗口。`reserved` / `processing` 的陈旧预留会在同一用户下一次 reserve 时自动恢复；TTL 为 5 分钟，长于 Worker 允许的最长 120 秒模型超时。旧 `user_quota`、`platform_paid_credits` 和旧 RPC 保留兼容，但 V2 Worker 不读取、扣减或返回它们。
 
