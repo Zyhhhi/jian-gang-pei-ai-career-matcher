@@ -5,6 +5,10 @@ import test from 'node:test';
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const workerSource = readFileSync(new URL('../worker/index.js', import.meta.url), 'utf8');
 const worker = await import(`data:text/javascript;base64,${Buffer.from(workerSource).toString('base64')}`);
+const limitsStart = html.indexOf('const AI_OUTPUT_LIMITS =');
+const limitsEnd = html.indexOf('const OWN_API_CONFIG =', limitsStart);
+if (limitsStart < 0 || limitsEnd < 0) throw new Error('无法定位输出边界契约');
+const limitsSource = html.slice(limitsStart, limitsEnd);
 const ownStart = html.indexOf('/* OWN_API_DIRECT_START */');
 const ownEnd = html.indexOf('/* OWN_API_DIRECT_END */');
 if (ownStart < 0 || ownEnd < 0 || ownEnd <= ownStart) throw new Error('无法定位自带 Key 直连模块');
@@ -30,7 +34,20 @@ function createHarness(fetchImpl) {
   const api = new Function('deps', `
     const { fetchImpl } = deps;
     const fetch = fetchImpl;
-    const TRUSTED_REPORT_SCHEMA_VERSION = '1.1';
+    const effects = [];
+    let ownApiRequestInFlight = false;
+    let currentAuthSession = { user: { id: 'synthetic-user' } };
+    let currentResult = null;
+    let currentRecordId = null;
+    const getUserApiKey = () => 'sk-test-secret-never-persisted';
+    const setStatus = (message, type = '') => effects.push({ type: 'status', message, statusType: type });
+    const setStep = step => effects.push({ type: 'step', step });
+    const finishSteps = () => effects.push({ type: 'finish' });
+    const renderResult = () => effects.push({ type: 'renderResult' });
+    const renderHistory = () => effects.push({ type: 'renderHistory' });
+    const saveHistory = () => { effects.push({ type: 'saveHistory' }); return 'history-id'; };
+    const TRUSTED_REPORT_SCHEMA_VERSION = '1.2';
+    ${limitsSource}
     const OWN_API_CONFIG = Object.freeze({
       SCHEMA_VERSION: TRUSTED_REPORT_SCHEMA_VERSION,
       ENDPOINT: 'https://api.deepseek.com/chat/completions',
@@ -54,15 +71,21 @@ function createHarness(fetchImpl) {
     return {
       buildOwnApiDirectRequest,
       buildOwnApiReportSchemaExample,
+      buildOwnApiPrompt,
       callOwnApiDirect,
+      injectOwnApiTrustedMetadata,
       normalizeOwnApiResult,
       normalizeTrustedPlatformResult,
       normalizeResult,
       assertCompleteApplicationPackage,
       parseOwnApiModelJson,
+      projectOwnApiAllowedContent,
       validateOwnApiDirectReport,
       ownApiErrorMessage,
-      isUsableOwnApiKey
+      isUsableOwnApiKey,
+      AI_OUTPUT_LIMITS,
+      runOwnApiAnalyze,
+      effects
     };
   `)({ fetchImpl });
   return api;
@@ -110,6 +133,7 @@ test('自带 Key 固定直连 DeepSeek，请求体不含 Key、Worker 或 Supaba
   assert.equal(requestBody.stream, false);
   assert.deepEqual(requestBody.response_format, { type: 'json_object' });
   assert.equal(requestBody.max_tokens, 6144);
+  assert.equal('temperature' in requestBody, false);
   assert.doesNotMatch(JSON.stringify(requestBody), new RegExp(secret));
 
   await harness.callOwnApiDirect(secret, requestBody);
@@ -121,34 +145,47 @@ test('自带 Key 固定直连 DeepSeek，请求体不含 Key、Worker 或 Supaba
   assert.doesNotMatch(calls[0].url, /worker|supabase|rpc/i);
 });
 
-test('自带 Key 与 Worker 使用同一份 Schema 1.1 严格结构', () => {
+test('自带 Key 与 Worker 使用同一份 Schema 1.2 内容结构和边界', () => {
   const harness = createHarness(async () => response(500, {}));
-  const report = harness.buildOwnApiReportSchemaExample('own-request-id', 'deepseek-v4-flash');
-  assert.deepEqual(report, worker.schemaExample('own-request-id', 'deepseek-v4-flash'));
-  const parsed = harness.parseOwnApiModelJson(`\`\`\`json\n${JSON.stringify(report)}\n\`\`\``);
-  assert.deepEqual(
-    harness.validateOwnApiDirectReport(parsed, { requestId: 'own-request-id', model: 'deepseek-v4-flash' }),
-    report
-  );
-  assert.throws(
-    () => harness.validateOwnApiDirectReport({ ...report, requestId: 'other-request' }, { requestId: 'own-request-id', model: 'deepseek-v4-flash' }),
-      error => error.code === 'INVALID_MODEL_OUTPUT'
-  );
-  assert.throws(
-    () => harness.validateOwnApiDirectReport({ report }, { requestId: 'own-request-id', model: 'deepseek-v4-flash' }),
-    error => error.code === 'INVALID_MODEL_OUTPUT'
-  );
+  const content = harness.buildOwnApiReportSchemaExample();
+  assert.deepEqual(content, worker.schemaExample());
+  assert.deepEqual(harness.AI_OUTPUT_LIMITS, worker.AI_OUTPUT_LIMITS);
+  assert.deepEqual(Object.keys(harness.AI_OUTPUT_LIMITS.arrays).sort(), [
+    'coreResponsibilities', 'existingKeywords', 'hardRequirements', 'interviewItems',
+    'jdKeywords', 'matches', 'missingKeywords', 'recommendationReasons',
+    'resumeSuggestions', 'reverseQuestions', 'risks', 'scoreRationale', 'trustItems'
+  ].sort());
+  Object.values(harness.AI_OUTPUT_LIMITS.arrays).forEach(limit => {
+    assert.ok(Number.isInteger(limit.min) && limit.min >= 1);
+    assert.ok(Number.isInteger(limit.max) && limit.max >= limit.min);
+  });
+  Object.values(harness.AI_OUTPUT_LIMITS.text).forEach(max => assert.ok(Number.isInteger(max) && max > 0));
+  assert.equal('schemaVersion' in content, false);
+  assert.equal('requestId' in content, false);
+  assert.equal('model' in content, false);
+  const prompt = harness.buildOwnApiPrompt({}, {});
+  assert.doesNotMatch(prompt, /Set requestId|Set model|"schemaVersion"|"requestId"|"model"/);
+  assert.match(prompt, /Array bounds:[\s\S]*reverse questions 1-4/);
+  assert.match(prompt, /Text bounds in characters:[\s\S]*email subject\/email body\/attachment 360\/360\/100\/800\/240/);
+  const parsed = harness.parseOwnApiModelJson(`\`\`\`json\n${JSON.stringify(content)}\n\`\`\``);
+  assert.deepEqual(harness.validateOwnApiDirectReport(parsed), content);
+
+  const injected = harness.injectOwnApiTrustedMetadata(content, 'own-request-id', 'deepseek-v4-flash');
+  assert.equal(injected.schemaVersion, '1.2');
+  assert.equal(injected.requestId, 'own-request-id');
+  assert.equal(injected.model, 'deepseek-v4-flash');
 });
 
-test('Schema 1.1 规范化后所有 UI 成品字段完整且不依赖 section 名称', () => {
+test('Schema 1.2 规范化后所有 UI 成品字段完整且不依赖 section 名称', () => {
   const harness = createHarness(async () => response(500, {}));
-  const report = harness.buildOwnApiReportSchemaExample('own-request-id', 'deepseek-v4-flash');
+  const report = harness.buildOwnApiReportSchemaExample();
   report.resumeSuggestions[0].section = '任意合法模块名称';
   report.resumeSuggestions[0].evidenceStatus = 'needs_user_confirmation';
   report.resumeRewrite.summary = '需本人确认：请确认总结中的项目范围。';
 
   const ownResult = harness.normalizeOwnApiResult(report, 'own-request-id', { jobTitle: '合成岗位' });
-  const platformResult = harness.normalizeTrustedPlatformResult(report, { model: 'deepseek-v4-flash' }, { jobTitle: '合成岗位' });
+  const trusted = harness.injectOwnApiTrustedMetadata(report, 'own-request-id', 'deepseek-v4-flash');
+  const platformResult = harness.normalizeTrustedPlatformResult(trusted, { model: 'deepseek-v4-flash' }, { jobTitle: '合成岗位' });
   const mockResult = structuredClone(ownResult);
   mockResult.meta = { mock: true };
 
@@ -167,7 +204,7 @@ test('Schema 1.1 规范化后所有 UI 成品字段完整且不依赖 section �
 
 test('关键成品字段缺失、空白或空数组必须拒绝，需本人确认内容允许展示', () => {
   const harness = createHarness(async () => response(500, {}));
-  const base = harness.buildOwnApiReportSchemaExample('own-request-id', 'deepseek-v4-flash');
+  const base = harness.buildOwnApiReportSchemaExample();
   const invalidMutations = [
     value => { delete value.resumeRewrite; },
     value => { delete value.outreachScripts.emailBody; },
@@ -181,8 +218,8 @@ test('关键成品字段缺失、空白或空数组必须拒绝，需本人确�
     const report = structuredClone(base);
     mutate(report);
     assert.throws(
-      () => harness.validateOwnApiDirectReport(report, { requestId: 'own-request-id', model: 'deepseek-v4-flash' }),
-      error => error.code === 'INVALID_MODEL_OUTPUT'
+      () => harness.validateOwnApiDirectReport(report),
+      error => ['MISSING_FIELD', 'EMPTY_STRING', 'EMPTY_REVERSE_QUESTIONS'].includes(error.code)
     );
   });
 
@@ -196,7 +233,7 @@ test('关键成品字段缺失、空白或空数组必须拒绝，需本人确�
 
 test('完整结果保存并重新加载后不丢字段，历史不保存 Key、Token 或完整输入', () => {
   const harness = createHarness(async () => response(500, {}));
-  const report = harness.buildOwnApiReportSchemaExample('own-request-id', 'deepseek-v4-flash');
+  const report = harness.buildOwnApiReportSchemaExample();
   const result = harness.normalizeOwnApiResult(report, 'own-request-id', { jobTitle: '合成岗位' });
   result.meta.accessToken = 'result-access-token';
   const fullResume = 'FULL_RESUME_INPUT_SHOULD_NOT_BE_STORED';
@@ -218,7 +255,7 @@ test('完整结果保存并重新加载后不丢字段，历史不保存 Key、T
   assert.deepEqual(reloaded.outreachScripts, result.outreachScripts);
 });
 
-test('401、截断输出和非 JSON 响应都明确失败，不产生成功结果', async () => {
+test('401、截断输出和非 JSON 响应都以脱敏错误明确失败', async () => {
   const unauthorized = createHarness(async () => response(401, { error: { message: 'ignored' } }));
   await assert.rejects(
     () => unauthorized.callOwnApiDirect('sk-test-secret-never-persisted', {}),
@@ -229,9 +266,111 @@ test('401、截断输出和非 JSON 响应都明确失败，不产生成功结�
   const truncated = createHarness(async () => response(200, { choices: [{ finish_reason: 'length', message: { content: '{' } }] }));
   await assert.rejects(
     () => truncated.callOwnApiDirect('sk-test-secret-never-persisted', {}),
-    error => error.code === 'INVALID_MODEL_OUTPUT'
+    error => error.code === 'OUTPUT_TRUNCATED' && error.finishReason === 'length'
   );
-  assert.throws(() => truncated.parseOwnApiModelJson('not json'), error => error.code === 'INVALID_MODEL_OUTPUT');
+  assert.throws(() => truncated.parseOwnApiModelJson('not json'), error => error.code === 'MODEL_JSON_PARSE_FAILED');
+  assert.throws(() => truncated.parseOwnApiModelJson('{"scores":'), error => error.code === 'MODEL_JSON_PARSE_FAILED');
+});
+
+test('未知字段被投影丢弃，别名与错误嵌套仍因缺少允许字段失败', () => {
+  const harness = createHarness(async () => response(500, {}));
+  const content = harness.buildOwnApiReportSchemaExample();
+  content.unexpectedRoot = 'PRIVATE_UNKNOWN_VALUE';
+  content.outreachScripts.extraMessage = 'PRIVATE_NESTED_VALUE';
+  const diagnostics = [];
+  const validated = harness.validateOwnApiDirectReport(content, { diagnostics });
+  assert.equal('unexpectedRoot' in validated, false);
+  assert.equal('extraMessage' in validated.outreachScripts, false);
+  assert.deepEqual(diagnostics.map(item => item.code), ['UNEXPECTED_FIELD_DROPPED', 'UNEXPECTED_FIELD_DROPPED']);
+  assert.deepEqual(diagnostics.map(item => item.fieldPath), ['outreachScripts', 'report']);
+  assert.doesNotMatch(JSON.stringify(diagnostics), /PRIVATE_UNKNOWN_VALUE|PRIVATE_NESTED_VALUE|unexpectedRoot|extraMessage/);
+
+  const aliased = structuredClone(validated);
+  aliased.outreachScripts.email = aliased.outreachScripts.emailBody;
+  delete aliased.outreachScripts.emailBody;
+  assert.throws(
+    () => harness.validateOwnApiDirectReport(aliased),
+    error => error.code === 'MISSING_FIELD' && error.fieldPath === 'outreachScripts.emailBody'
+  );
+  const nested = structuredClone(validated);
+  nested.resumeRewrite = { content: nested.resumeRewrite };
+  assert.throws(
+    () => harness.validateOwnApiDirectReport(nested),
+    error => error.code === 'MISSING_FIELD' && error.fieldPath === 'resumeRewrite.summary'
+  );
+});
+
+test('null 可空字段通过，空字符串、错误类型和输出上限明确失败', () => {
+  const harness = createHarness(async () => response(500, {}));
+  const base = harness.buildOwnApiReportSchemaExample();
+  assert.equal(harness.validateOwnApiDirectReport(base).jobSummary.salary, null);
+
+  const empty = structuredClone(base);
+  empty.jobSummary.salary = '';
+  assert.throws(() => harness.validateOwnApiDirectReport(empty), error => error.code === 'EMPTY_STRING' && error.fieldPath === 'jobSummary.salary');
+
+  const wrongType = structuredClone(base);
+  wrongType.reverseQuestions = '问题';
+  assert.throws(() => harness.validateOwnApiDirectReport(wrongType), error => error.code === 'TYPE_MISMATCH' && error.fieldPath === 'reverseQuestions');
+
+  const longText = structuredClone(base);
+  longText.outreachScripts.emailSubject = '字'.repeat(harness.AI_OUTPUT_LIMITS.text.emailSubject + 1);
+  assert.throws(() => harness.validateOwnApiDirectReport(longText), error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'outreachScripts.emailSubject');
+
+  const longArray = structuredClone(base);
+  longArray.reverseQuestions = Array.from({ length: harness.AI_OUTPUT_LIMITS.arrays.reverseQuestions.max + 1 }, () => '有效问题？');
+  assert.throws(() => harness.validateOwnApiDirectReport(longArray), error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'reverseQuestions');
+});
+
+test('错误对象与用户提示只包含错误码和允许字段路径，不包含正文、输入或凭证', () => {
+  const harness = createHarness(async () => response(500, {}));
+  const privateSentinels = ['PRIVATE_MODEL_BODY', 'PRIVATE_RESUME_INPUT', 'PRIVATE_JOB_INPUT', 'sk-private-key', 'Bearer private-token'];
+  const content = harness.buildOwnApiReportSchemaExample();
+  delete content.outreachScripts.emailBody;
+  let caught;
+  try { harness.validateOwnApiDirectReport(content); } catch (error) { caught = error; }
+  const serialized = JSON.stringify({ code: caught.code, fieldPath: caught.fieldPath, finishReason: caught.finishReason, message: harness.ownApiErrorMessage(caught) });
+  assert.equal(caught.code, 'MISSING_FIELD');
+  assert.equal(caught.fieldPath, 'outreachScripts.emailBody');
+  privateSentinels.forEach(value => assert.equal(serialized.includes(value), false));
+});
+
+test('直连失败不会自动重试，单次 fetch 后即返回错误', async () => {
+  let calls = 0;
+  const harness = createHarness(async () => {
+    calls += 1;
+    return response(200, { choices: [{ finish_reason: 'length', message: { content: '{' } }] });
+  });
+  await assert.rejects(() => harness.callOwnApiDirect('sk-test-secret-never-persisted', {}), error => error.code === 'OUTPUT_TRUNCATED');
+  assert.equal(calls, 1);
+  assert.doesNotMatch(ownModuleSource, /retry|secondAttempt|for\s*\([^)]*callOwnApiDirect/i);
+});
+
+test('结构失败不保存、不渲染成功，完整 Schema 1.2 才保存一次', async () => {
+  let failedCalls = 0;
+  const failed = createHarness(async () => {
+    failedCalls += 1;
+    return response(200, { choices: [{ finish_reason: 'stop', message: { content: '{"scores":' } }] });
+  });
+  await assert.rejects(
+    () => failed.runOwnApiAnalyze({ resumeText: '固定虚构简历' }, { jdText: '固定虚构 JD' }),
+    error => error.code === 'MODEL_JSON_PARSE_FAILED'
+  );
+  assert.equal(failedCalls, 1);
+  assert.equal(failed.effects.some(item => ['saveHistory', 'renderResult', 'finish'].includes(item.type)), false);
+
+  let successCalls = 0;
+  let successHarness;
+  successHarness = createHarness(async () => {
+    successCalls += 1;
+    const content = successHarness.buildOwnApiReportSchemaExample();
+    return response(200, { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(content) } }] });
+  });
+  await successHarness.runOwnApiAnalyze({ resumeText: '固定虚构简历' }, { jdText: '固定虚构 JD', jobTitle: '虚构岗位' });
+  assert.equal(successCalls, 1);
+  assert.equal(successHarness.effects.filter(item => item.type === 'saveHistory').length, 1);
+  assert.equal(successHarness.effects.filter(item => item.type === 'renderResult').length, 1);
+  assert.equal(successHarness.effects.filter(item => item.type === 'finish').length, 1);
 });
 
 test('未登录不能保存 Key，分析分支不会把自带 Key 失败回退为 Mock', () => {

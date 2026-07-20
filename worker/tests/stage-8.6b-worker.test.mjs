@@ -38,9 +38,9 @@ function validPayload(requestId = 'request-12345678') {
   };
 }
 
-function validReport(requestId = 'request-12345678', model = MODEL) {
+function validContent() {
   return {
-    schemaVersion: '1.1', requestId, generatedAt: '2026-07-14T08:00:00.000Z', model,
+    generatedAt: '2026-07-14T08:00:00.000Z',
     jobSummary: { jobTitle: 'AI 产品助理', companyName: '示例科技', location: '上海', salary: null, educationRequirement: '本科', experienceRequirement: '应届生', coreResponsibilities: ['JD 要求负责 AI 产品需求分析和原型设计'], hardRequirements: ['JD 明确要求良好的沟通协作能力'] },
     recommendation: { recommendation: 'cautious', summary: '现有项目证据覆盖部分核心职责，仍需核实落地深度。', reasons: [{ kind: 'inference', statement: '项目方向部分匹配', evidence: '简历写有用户访谈、PRD 和原型设计', confidence: 78 }] },
     scores: { overall: 72, skills: 76, projects: 70, tools: 62, industry: 55, educationAndExperience: 74, rationale: [{ dimension: 'skills', score: 76, evidence: '简历写有用户访谈、PRD 和原型设计' }] },
@@ -214,13 +214,13 @@ class MockBackend {
   provider(options) {
     this.providerCalls += 1;
     const input = JSON.parse(options.body);
-    const requestId = JSON.parse(input.messages[1].content.match(/Set requestId to exactly ("[^"]+")/)[1]);
     if (this.providerMode === 'timeout') return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
     if (this.providerMode === '429') return Response.json({ error: { message: 'limited' } }, { status: 429 });
-    if (this.providerMode === 'non-json') return Response.json({ choices: [{ message: { content: 'not json' } }] });
-    const report = validReport(requestId, input.model);
+    if (this.providerMode === 'non-json') return Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'not json' } }] });
+    if (this.providerMode === 'length') return Response.json({ choices: [{ finish_reason: 'length', message: { content: '{' } }] });
+    const report = validContent();
     if (this.providerMode === 'missing-field') delete report.scores.overall;
-    return Response.json({ choices: [{ message: { content: JSON.stringify(report) } }] });
+    return Response.json({ model: input.model, choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(report) } }] });
   }
 }
 
@@ -262,11 +262,18 @@ test('DeepSeek request and sanitized Supabase diagnostics retain their security 
   assert.doesNotMatch(JSON.stringify(diagnostic), /private@example\.com|sb_secret_hidden|sk-hidden/);
 });
 
-test('Schema 1.1 requires every complete application package field', () => {
-  const report = validReport();
-  assert.deepEqual(worker.validateAnalysisReport(report, { requestId: report.requestId, model: MODEL }), report);
-  assert.equal(worker.schemaExample(report.requestId, MODEL).schemaVersion, '1.1');
-  assert.match(worker.buildPrompt(report.requestId, MODEL, validPayload().resumeProfile, validPayload().jobDraft), /Do not rename, nest, alias, or omit/);
+test('Schema 1.2 validates business content, injects control fields and shares output limits', () => {
+  const content = validContent();
+  const report = worker.validateAnalysisReport(content, { requestId: 'request-12345678', model: MODEL });
+  assert.equal(report.schemaVersion, '1.2');
+  assert.equal(report.requestId, 'request-12345678');
+  assert.equal(report.model, MODEL);
+  const example = worker.schemaExample();
+  assert.equal(worker.validateAnalysisReport(example, { requestId: 'request-example', model: MODEL }).schemaVersion, '1.2');
+  assert.equal('schemaVersion' in example, false);
+  const prompt = worker.buildPrompt(validPayload().resumeProfile, validPayload().jobDraft);
+  assert.match(prompt, /Do not rename, nest, alias, omit, or add fields/);
+  assert.doesNotMatch(prompt, /Set requestId|Set model|"schemaVersion"|"requestId"|"model"/);
 
   const invalidReports = [
     value => { delete value.resumeRewrite; },
@@ -278,20 +285,88 @@ test('Schema 1.1 requires every complete application package field', () => {
     value => { value.reverseQuestions = ['   ']; }
   ];
   invalidReports.forEach(mutate => {
-    const value = structuredClone(report);
+    const value = structuredClone(content);
     mutate(value);
     assert.throws(
-      () => worker.validateAnalysisReport(value, { requestId: report.requestId, model: MODEL }),
-      error => error.code === 'INVALID_MODEL_OUTPUT'
+      () => worker.validateAnalysisReport(value, { requestId: 'request-12345678', model: MODEL }),
+      error => ['MISSING_FIELD', 'EMPTY_STRING', 'EMPTY_REVERSE_QUESTIONS'].includes(error.code)
     );
   });
 
-  const needsConfirmation = structuredClone(report);
+  const needsConfirmation = structuredClone(content);
   needsConfirmation.resumeRewrite.summary = '需本人确认：请确认该总结中的项目范围。';
   assert.equal(
-    worker.validateAnalysisReport(needsConfirmation, { requestId: report.requestId, model: MODEL }).resumeRewrite.summary,
+    worker.validateAnalysisReport(needsConfirmation, { requestId: 'request-12345678', model: MODEL }).resumeRewrite.summary,
     needsConfirmation.resumeRewrite.summary
   );
+});
+
+test('Schema 1.2 drops unknown fields without retaining names or values', () => {
+  const content = validContent();
+  content.privateRoot = 'PRIVATE_UNKNOWN_VALUE';
+  content.outreachScripts.privateNested = 'PRIVATE_NESTED_VALUE';
+  const diagnostics = [];
+  const report = worker.validateAnalysisReport(content, { requestId: 'request-unknown-fields', model: MODEL }, { diagnostics });
+  assert.equal('privateRoot' in report, false);
+  assert.equal('privateNested' in report.outreachScripts, false);
+  assert.deepEqual(diagnostics.map(item => item.code), ['UNEXPECTED_FIELD_DROPPED', 'UNEXPECTED_FIELD_DROPPED']);
+  assert.deepEqual(diagnostics.map(item => item.fieldPath), ['outreachScripts', 'report']);
+  assert.doesNotMatch(JSON.stringify(diagnostics), /privateRoot|privateNested|PRIVATE_UNKNOWN_VALUE|PRIVATE_NESTED_VALUE/);
+});
+
+test('Schema 1.2 rejects aliases, wrong nesting, empty nullable strings and contract overflow', () => {
+  const alias = validContent();
+  alias.outreachScripts.email = alias.outreachScripts.emailBody;
+  delete alias.outreachScripts.emailBody;
+  assert.throws(
+    () => worker.validateAnalysisReport(alias, { requestId: 'request-alias-field', model: MODEL }),
+    error => error.code === 'MISSING_FIELD' && error.fieldPath === 'outreachScripts.emailBody'
+  );
+
+  const nested = validContent();
+  nested.resumeRewrite = { content: nested.resumeRewrite };
+  assert.throws(
+    () => worker.validateAnalysisReport(nested, { requestId: 'request-wrong-nesting', model: MODEL }),
+    error => error.code === 'MISSING_FIELD' && error.fieldPath === 'resumeRewrite.summary'
+  );
+
+  const emptyNullable = validContent();
+  emptyNullable.jobSummary.salary = '';
+  assert.throws(
+    () => worker.validateAnalysisReport(emptyNullable, { requestId: 'request-empty-field', model: MODEL }),
+    error => error.code === 'EMPTY_STRING' && error.fieldPath === 'jobSummary.salary'
+  );
+
+  const longSubject = validContent();
+  longSubject.outreachScripts.emailSubject = '字'.repeat(worker.AI_OUTPUT_LIMITS.text.emailSubject + 1);
+  assert.throws(
+    () => worker.validateAnalysisReport(longSubject, { requestId: 'request-long-subject', model: MODEL }),
+    error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'outreachScripts.emailSubject'
+  );
+
+  const tooManyQuestions = validContent();
+  tooManyQuestions.reverseQuestions = Array.from({ length: worker.AI_OUTPUT_LIMITS.arrays.reverseQuestions.max + 1 }, () => '有效问题？');
+  assert.throws(
+    () => worker.validateAnalysisReport(tooManyQuestions, { requestId: 'request-many-questions', model: MODEL }),
+    error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'reverseQuestions'
+  );
+});
+
+test('Schema failures expose only fixed codes and allowlisted paths', () => {
+  const content = validContent();
+  content.resumeRewrite.summary = 'PRIVATE_RESUME_SENTINEL';
+  content.outreachScripts.boss = 'Bearer PRIVATE_TOKEN_SENTINEL';
+  delete content.outreachScripts.emailBody;
+  let caught;
+  try {
+    worker.validateAnalysisReport(content, { requestId: 'request-safe-error', model: MODEL });
+  } catch (error) {
+    caught = error;
+  }
+  assert.equal(caught.code, 'MISSING_FIELD');
+  assert.equal(caught.fieldPath, 'outreachScripts.emailBody');
+  assert.equal(caught.finishReason, null);
+  assert.doesNotMatch(JSON.stringify(caught), /PRIVATE_RESUME_SENTINEL|PRIVATE_TOKEN_SENTINEL|Bearer/);
 });
 
 test('server kill switch is closed by default and explicit false prevents every external request', async () => {
@@ -402,12 +477,19 @@ test('the third accepted request in a rolling 60-second window is rejected, incl
   assert.equal(backend.providerCalls, 2);
 });
 
-for (const [mode, expected] of [['429', 'MODEL_PROVIDER_ERROR'], ['timeout', 'MODEL_TIMEOUT'], ['non-json', 'INVALID_MODEL_OUTPUT'], ['missing-field', 'INVALID_MODEL_OUTPUT']]) {
+for (const [mode, expected] of [
+  ['429', 'MODEL_PROVIDER_ERROR'],
+  ['timeout', 'MODEL_TIMEOUT'],
+  ['length', 'OUTPUT_TRUNCATED'],
+  ['non-json', 'MODEL_JSON_PARSE_FAILED'],
+  ['missing-field', 'MISSING_FIELD']
+]) {
   test(`provider ${mode} refunds daily and monthly reservations but remains in the anti-abuse window`, async () => {
     const backend = new MockBackend({ providerMode: mode });
     const id = `request-failure-${mode}`;
     const result = await body(await worker.handleRequest(makeRequest(validPayload(id)), ENV, { fetchImpl: backend.fetch }));
     assert.equal(result.errorCode, expected);
+    assert.equal(backend.providerCalls, 1, 'model failures must not trigger an automatic second provider call');
     const record = backend.requests.get(id);
     assert.equal(record.status, 'refunded');
     assert.equal(backend.existingPeriod(USER_ID, 'day', record.dayStart).reserved, 0);

@@ -24,6 +24,10 @@ const ownStart = html.indexOf('/* OWN_API_DIRECT_START */');
 const ownEnd = html.indexOf('/* OWN_API_DIRECT_END */');
 if (ownStart < 0 || ownEnd < 0) throw new Error('无法定位自带 Key 请求模块');
 const ownSource = html.slice(ownStart, ownEnd);
+const limitsStart = html.indexOf('const AI_OUTPUT_LIMITS =');
+const limitsEnd = html.indexOf('const OWN_API_CONFIG =', limitsStart);
+if (limitsStart < 0 || limitsEnd < 0) throw new Error('无法定位输出边界契约');
+const limitsSource = html.slice(limitsStart, limitsEnd);
 
 const draftStart = html.indexOf('function createEmptyJobDraft()');
 const draftEnd = html.indexOf('function hydrateJobDraft()', draftStart);
@@ -225,7 +229,8 @@ function createFillHarness({ scopeReady = true, random = 0, scope = 'guest' } = 
 
 function createOwnRequestHarness() {
   return new Function(`
-    const TRUSTED_REPORT_SCHEMA_VERSION = '1.1';
+    const TRUSTED_REPORT_SCHEMA_VERSION = '1.2';
+    ${limitsSource}
     const OWN_API_CONFIG = Object.freeze({
       SCHEMA_VERSION: TRUSTED_REPORT_SCHEMA_VERSION,
       ENDPOINT: 'https://api.deepseek.com/chat/completions',
