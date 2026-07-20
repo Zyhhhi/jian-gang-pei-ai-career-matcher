@@ -2,7 +2,7 @@
 
 阶段 8 的 Cloudflare Worker 只为后续平台 AI 模式保留安全调用链：
 
-若后续受控启用，前端会携带 Supabase access token、`requestId`、`analysisMode`、`resumeProfile` 和 `jobDraft` 调用 Worker。Worker 通过原子 V2 RPC 先预留可用次数，再调用 DeepSeek；成功输出通过 Schema 1.1 完整求职分析包校验后确认，失败、超时或无效输出通过 RPC 恢复预留。当前公开页面的 `ENABLE_PLATFORM_AI = false`，且 Worker 服务端熔断开关默认关闭，不会调用该 Worker。
+若后续受控启用，前端会携带 Supabase access token、`requestId`、`analysisMode`、`resumeProfile` 和 `jobDraft` 调用 Worker。Worker 通过原子 V2 RPC 先预留可用次数，再调用 DeepSeek；模型业务内容通过 Schema 1.2 有界契约校验后，由 Worker 注入 `schemaVersion`、`requestId`、`model` 和 UTC `generatedAt` 并确认成功，失败、超时或无效输出通过 RPC 恢复预留。当前公开页面的 `ENABLE_PLATFORM_AI = false`，且 Worker 服务端熔断开关默认关闭，不会调用该 Worker。
 
 ## 当前生产状态
 
@@ -99,7 +99,7 @@ wrangler deploy
 - Worker 不把简历原文、完整 JD、API Key 写入 `usage_events`。
 - 可用次数不足、登录失败、输入过长、重复请求和限流不会调用模型。
 - Provider 失败、超时、空内容、非 JSON 和 Schema 失败会恢复已预留次数。
-- 成功结果必须通过 Schema 1.1 的必填字段、类型、枚举、分数、requestId、证据和完整 UI 成品字段校验。
+- 成功结果必须通过 Schema 1.2 的必填字段、类型、枚举、分数、非空与输出边界校验；模型不再回显 `schemaVersion`、`requestId`、`model` 或 `generatedAt`，未知字段会按允许列表丢弃且不进入 UI 或历史。
 - 简历与 JD 被包裹在明确的数据边界内，内容中的指令不会被视为系统指令。
 - `PLATFORM_AI_ENABLED` 缺失或未严格设为 `true` 时，POST 在认证、额度 RPC 与模型调用之前返回 `503 PLATFORM_AI_DISABLED`；OPTIONS 仍可用于 CORS 健康检查。
 

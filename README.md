@@ -8,7 +8,7 @@
 - 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
 - 当前真实可用分析：本地规则 / Mock 分析，以及登录后的自带 DeepSeek Key 浏览器直连分析。
 - 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
-- 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；平台 AI 仍未开放。
+- 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；新的模型输出使用 Schema 1.2 有界业务内容契约，`schemaVersion`、`requestId`、`model` 和 UTC `generatedAt` 均由应用注入，平台 AI 仍未开放。
 - 当前平台 AI：前端已接线正式 Worker，但前端 `ENABLE_PLATFORM_AI=false`、Worker `PLATFORM_AI_ENABLED=false`，公开页面不会调用平台 Worker、DeepSeek 或真实额度 RPC。
 
 本地演示模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。
@@ -52,6 +52,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - TXT、PDF、DOCX 只在浏览器本地解析，不上传原始文件。
 - 用户自带 API Key 不写入 URL、Supabase、Worker 日志或代码仓库。
 - 自带 Key 固定请求 `https://api.deepseek.com/chat/completions`，固定模型 `deepseek-v4-flash`；不接受用户填写任意 Base URL。Key 只出现在浏览器到 DeepSeek 的 Authorization 请求头，不进入 Prompt、历史记录、埋点、错误信息或页面日志。
+- Schema 1.2 只要求模型生成允许列表内的业务字段；未知字段递归丢弃，必要字段缺失、类型错误、空内容或超出有界输出限制时均失败且不保存历史。
 - 本地浏览器 CORS 探针已由人工验证通过；GitHub Pages 正式域名发布前仍必须用用户本人临时 Key 完成一次 OPTIONS/POST 二次验收。若 CORS 失败，停止自带 Key 发布，不引入代理，也不回退 Mock。
 - 平台 AI 未开放前，前端不会把简历或 JD 发送到 Worker。
 
@@ -66,7 +67,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - V2 周期额度只由 service-role Worker RPC 处理：一次 reserve 在同一用户事务锁内完成陈旧预留恢复、60 秒防刷与日/月预留；失败/超时释放请求创建时的日/月预留，但仍保留该请求在 60 秒防刷窗口中。
 - 陈旧 `reserved` / `processing` 请求会在同一用户下一次 reserve 时自动恢复。TTL 为 5 分钟，长于 Worker 允许的最长 120 秒模型超时；完成或退款始终按请求记录的原始周期回写，跨日或跨月不改变归属。
 - `platform_paid_credits`、旧 `user_quota` 与旧 RPC 仍为兼容数据保留；V2 Worker 不读取、不扣减、不返回这些字段。
-- 严格结果 Schema、Prompt Injection 数据边界、输入长度限制和脱敏错误诊断。
+- Schema 1.2 有界结果契约、允许列表投影、Prompt Injection 数据边界、输入长度限制和脱敏错误诊断。
 - Worker 仅在模型成功且结果通过验证后确认一次成功；失败不会计入成功分析次数。
 
 当前本地检查不会连接真实 Supabase、重复执行 migration、调用真实 DeepSeek、修改 Worker 配置或写入真实密钥。任何再次部署前都必须单独确认，并检查被忽略的 `worker/wrangler.toml` 不会覆盖生产 CORS 配置。
@@ -81,6 +82,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - `docs/release-0.8.6c-f.md`：v0.8.6C-F 发布范围、正式 Worker 接线与关闭状态记录。
 - `docs/release-0.8.6c-g.md`：v0.8.6C-G 完整 AI 输出契约 hotfix 记录。
 - `docs/release-0.8.6c-h.md`：v0.8.6C-H 示例数据隐私 hotfix 记录。
+- `docs/release-0.8.6c-i.md`：v0.8.6C-I AI 输出稳定性 hotfix 记录。
 - `docs/supabase-email-otp-setup.md`：仅供管理员执行的 Supabase 邮件模板配置说明。
 - `docs/migrations/`：既有 Supabase schema 与 8.6B/8.6C 安全 migration；不得由前端执行。
 
