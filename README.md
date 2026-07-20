@@ -1,6 +1,6 @@
-# 简岗配 AI｜免费求职分析体验工具
+# 简岗配 · RoleFit AI｜免费求职分析体验工具
 
-简岗配 AI 面向应届生和初级岗位求职者。用户可在浏览器本地导入简历、输入岗位 JD，并生成岗位匹配分析与求职记录。
+简岗配 · RoleFit AI 面向应届生和初级岗位求职者。用户可在浏览器本地导入简历、输入岗位 JD，并生成岗位匹配分析与求职记录。
 
 ## 当前产品状态
 
@@ -79,6 +79,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - `docs/release-0.8.6c-a.md`：8.6C-A 页面和规则重置记录。
 - `docs/release-0.8.6c-b.md`：8.6C-B OTP 前端实现与验证边界。
 - `docs/release-0.8.6c-f.md`：v0.8.6C-F 发布范围、正式 Worker 接线与关闭状态记录。
+- `docs/release-0.8.6c-g.md`：v0.8.6C-G 完整 AI 输出契约 hotfix 记录。
 - `docs/supabase-email-otp-setup.md`：仅供管理员执行的 Supabase 邮件模板配置说明。
 - `docs/migrations/`：既有 Supabase schema 与 8.6B/8.6C 安全 migration；不得由前端执行。
 

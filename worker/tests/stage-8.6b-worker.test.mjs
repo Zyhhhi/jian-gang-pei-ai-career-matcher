@@ -40,7 +40,7 @@ function validPayload(requestId = 'request-12345678') {
 
 function validReport(requestId = 'request-12345678', model = MODEL) {
   return {
-    schemaVersion: '1.0', requestId, generatedAt: '2026-07-14T08:00:00.000Z', model,
+    schemaVersion: '1.1', requestId, generatedAt: '2026-07-14T08:00:00.000Z', model,
     jobSummary: { jobTitle: 'AI 产品助理', companyName: '示例科技', location: '上海', salary: null, educationRequirement: '本科', experienceRequirement: '应届生', coreResponsibilities: ['JD 要求负责 AI 产品需求分析和原型设计'], hardRequirements: ['JD 明确要求良好的沟通协作能力'] },
     recommendation: { recommendation: 'cautious', summary: '现有项目证据覆盖部分核心职责，仍需核实落地深度。', reasons: [{ kind: 'inference', statement: '项目方向部分匹配', evidence: '简历写有用户访谈、PRD 和原型设计', confidence: 78 }] },
     scores: { overall: 72, skills: 76, projects: 70, tools: 62, industry: 55, educationAndExperience: 74, rationale: [{ dimension: 'skills', score: 76, evidence: '简历写有用户访谈、PRD 和原型设计' }] },
@@ -49,6 +49,20 @@ function validReport(requestId = 'request-12345678', model = MODEL) {
     keywords: { jdKeywords: ['需求分析', '用户调研', 'PRD', '原型'], existingKeywords: ['需求分析', '用户调研', 'PRD', '原型'], missingKeywords: [{ keyword: '项目落地', status: 'needs_user_confirmation', reason: '简历未给出上线或交付证据' }] },
     resumeSuggestions: [{ section: '项目经历', originalText: '完成虚构校园项目的需求分析和原型设计。', issue: '缺少交付范围和反馈证据', suggestedText: '在确认事实后补充交付范围和测试反馈。', reason: 'JD 强调项目落地', evidenceStatus: 'needs_user_confirmation' }],
     interviewPrep: { likelyQuestions: ['如何完成需求优先级判断？'], projectDeepDiveQuestions: ['项目原型如何验证？'], weaknessQuestions: ['是否有上线或交付经验？'], conceptsToReview: ['需求优先级', '原型验证'], preparationAdvice: ['准备项目范围、过程和反馈证据'] },
+    resumeRewrite: {
+      summary: '需本人确认：具备需求访谈、PRD 和原型设计项目实践。',
+      projectExample: '需本人确认：围绕虚构校园项目完成需求分析、PRD 与原型设计，并根据测试反馈迭代。',
+      skillsExample: '需本人确认：可使用用户调研、需求分析、PRD 和原型设计推进项目。'
+    },
+    outreachScripts: {
+      boss: '您好，我关注贵公司的 AI 产品助理岗位，简历中有需求访谈、PRD 和原型设计项目实践。',
+      wechat: '您好，我想进一步了解 AI 产品助理岗位的需求分析和项目落地职责。',
+      emailSubject: 'AI 产品助理岗位投递',
+      emailBody: '您好，我希望投递 AI 产品助理岗位，简历中包含需求访谈、PRD 和原型设计项目实践。',
+      attachmentReminder: '请确认已附上简历和已有作品材料。'
+    },
+    selfIntroduction: '您好，我有需求访谈、PRD 和原型设计的项目实践，希望应聘 AI 产品助理岗位。',
+    reverseQuestions: ['该岗位入职后三个月最重要的项目交付是什么？'],
     trust: { overallConfidence: 78, missingInformation: ['项目是否真实上线'], assumptions: ['仅依据用户提供的简历和 JD 文本'], evidenceCoverage: 76 }
   };
 }
@@ -246,6 +260,38 @@ test('DeepSeek request and sanitized Supabase diagnostics retain their security 
   assert.equal(headers.Authorization, undefined);
   const diagnostic = worker.buildSupabaseFailureDiagnostic('/rest/v1/rpc/reserve_platform_ai_quota_v2?private=x', 400, JSON.stringify({ message: 'private@example.com sb_secret_hidden sk-hidden' }));
   assert.doesNotMatch(JSON.stringify(diagnostic), /private@example\.com|sb_secret_hidden|sk-hidden/);
+});
+
+test('Schema 1.1 requires every complete application package field', () => {
+  const report = validReport();
+  assert.deepEqual(worker.validateAnalysisReport(report, { requestId: report.requestId, model: MODEL }), report);
+  assert.equal(worker.schemaExample(report.requestId, MODEL).schemaVersion, '1.1');
+  assert.match(worker.buildPrompt(report.requestId, MODEL, validPayload().resumeProfile, validPayload().jobDraft), /Do not rename, nest, alias, or omit/);
+
+  const invalidReports = [
+    value => { delete value.resumeRewrite; },
+    value => { delete value.outreachScripts.emailBody; },
+    value => { value.resumeRewrite.summary = '   '; },
+    value => { value.outreachScripts.boss = ''; },
+    value => { value.selfIntroduction = '\t'; },
+    value => { value.reverseQuestions = []; },
+    value => { value.reverseQuestions = ['   ']; }
+  ];
+  invalidReports.forEach(mutate => {
+    const value = structuredClone(report);
+    mutate(value);
+    assert.throws(
+      () => worker.validateAnalysisReport(value, { requestId: report.requestId, model: MODEL }),
+      error => error.code === 'INVALID_MODEL_OUTPUT'
+    );
+  });
+
+  const needsConfirmation = structuredClone(report);
+  needsConfirmation.resumeRewrite.summary = '需本人确认：请确认该总结中的项目范围。';
+  assert.equal(
+    worker.validateAnalysisReport(needsConfirmation, { requestId: report.requestId, model: MODEL }).resumeRewrite.summary,
+    needsConfirmation.resumeRewrite.summary
+  );
 });
 
 test('server kill switch is closed by default and explicit false prevents every external request', async () => {
