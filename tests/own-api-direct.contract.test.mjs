@@ -117,6 +117,49 @@ function response(status, payload) {
   return { ok: status >= 200 && status < 300, status, text: async () => JSON.stringify(payload) };
 }
 
+const BOUNDED_ARRAY_CASES = [
+  ['jobSummary.coreResponsibilities', 'coreResponsibilities', 'text'],
+  ['jobSummary.hardRequirements', 'hardRequirements', 'text'],
+  ['recommendation.reasons', 'recommendationReasons', 'object'],
+  ['scores.rationale', 'scoreRationale', 'object'],
+  ['matches', 'matches', 'object'],
+  ['risks', 'risks', 'object'],
+  ['keywords.jdKeywords', 'jdKeywords', 'text'],
+  ['keywords.existingKeywords', 'existingKeywords', 'text'],
+  ['keywords.missingKeywords', 'missingKeywords', 'object'],
+  ['resumeSuggestions', 'resumeSuggestions', 'object'],
+  ['interviewPrep.likelyQuestions', 'interviewItems', 'text'],
+  ['interviewPrep.projectDeepDiveQuestions', 'interviewItems', 'text'],
+  ['interviewPrep.weaknessQuestions', 'interviewItems', 'text'],
+  ['interviewPrep.conceptsToReview', 'interviewItems', 'text'],
+  ['interviewPrep.preparationAdvice', 'interviewItems', 'text'],
+  ['reverseQuestions', 'reverseQuestions', 'text'],
+  ['trust.missingInformation', 'trustItems', 'text'],
+  ['trust.assumptions', 'trustItems', 'text']
+];
+
+function valueAtPath(root, path) {
+  return path.split('.').reduce((value, key) => value[key], root);
+}
+
+function setValueAtPath(root, path, value) {
+  const keys = path.split('.');
+  const leaf = keys.pop();
+  const parent = keys.reduce((current, key) => current[key], root);
+  parent[leaf] = value;
+}
+
+function overLimitItems(seed, count, kind) {
+  if (kind === 'text') return Array.from({ length: count }, (_, index) => `${String(seed[0]).trim()} ${index + 1}`);
+  return Array.from({ length: count }, () => structuredClone(seed[0]));
+}
+
+function businessContentFromWorkerReport(report) {
+  const content = structuredClone(report);
+  ['schemaVersion', 'requestId', 'model', 'generatedAt'].forEach(key => delete content[key]);
+  return content;
+}
+
 test('自带 Key 固定直连 DeepSeek，请求体不含 Key、Worker 或 Supabase 端点', async () => {
   const calls = [];
   const harness = createHarness(async (url, options) => {
@@ -329,6 +372,121 @@ test('模型伪造 generatedAt 被丢弃，最终只使用应用 UTC 时间', ()
   assert.equal(new Date(report.generatedAt).toISOString(), report.generatedAt);
 });
 
+test('所有受限数组的 max+1 与 max+5 输出均全量校验后稳定截取，前端与 Worker 一致', () => {
+  const harness = createHarness(async () => response(500, {}));
+  for (const [path, limitKey, kind] of BOUNDED_ARRAY_CASES) {
+    for (const extra of [1, 5]) {
+      const content = harness.buildOwnApiReportSchemaExample();
+      const limit = harness.AI_OUTPUT_LIMITS.arrays[limitKey];
+      const raw = overLimitItems(valueAtPath(content, path), limit.max + extra, kind);
+      setValueAtPath(content, path, raw);
+
+      const ownDiagnostics = [];
+      const ownNormalized = harness.validateOwnApiDirectReport(structuredClone(content), { diagnostics: ownDiagnostics });
+      const workerDiagnostics = [];
+      const workerReport = worker.validateAnalysisReport(
+        structuredClone(content),
+        { requestId: 'bounded-array-request', model: 'deepseek-v4-flash' },
+        { diagnostics: workerDiagnostics, now: () => Date.parse('2026-07-20T14:00:00.000Z') }
+      );
+      const workerNormalized = businessContentFromWorkerReport(workerReport);
+      assert.deepEqual(workerNormalized, ownNormalized, `${path} must normalize identically`);
+      assert.deepEqual(valueAtPath(ownNormalized, path), raw.slice(0, limit.max), `${path} must retain the first max items`);
+      const expectedWarning = [{ code: 'ARRAY_ITEMS_TRUNCATED', fieldPath: path }];
+      assert.deepEqual(ownDiagnostics, expectedWarning);
+      assert.deepEqual(workerDiagnostics, expectedWarning);
+      assert.deepEqual(Object.keys(ownDiagnostics[0]).sort(), ['code', 'fieldPath']);
+    }
+  }
+});
+
+test('字符串数组统一去空、trim、稳定去重并安全限长', () => {
+  const harness = createHarness(async () => response(500, {}));
+  const content = harness.buildOwnApiReportSchemaExample();
+  content.keywords.jdKeywords = [
+    '  Alpha  ', '', 'Alpha', '  Beta ', '   ', 'Beta',
+    'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota'
+  ];
+  const diagnostics = [];
+  const normalized = harness.validateOwnApiDirectReport(content, { diagnostics });
+  assert.deepEqual(normalized.keywords.jdKeywords, ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta']);
+  assert.deepEqual(diagnostics, [{ code: 'ARRAY_ITEMS_TRUNCATED', fieldPath: 'keywords.jdKeywords' }]);
+  assert.doesNotMatch(JSON.stringify(diagnostics), /Alpha|Beta|Iota|13|9/);
+});
+
+test('数组归一化不掩盖低于 min、项目类型、尾部缺字段或字符串超长', () => {
+  const harness = createHarness(async () => response(500, {}));
+  const emptyKeywords = harness.buildOwnApiReportSchemaExample();
+  emptyKeywords.keywords.jdKeywords = ['', '   '];
+  assert.throws(
+    () => harness.validateOwnApiDirectReport(emptyKeywords),
+    error => error.code === 'EMPTY_ARRAY' && error.fieldPath === 'keywords.jdKeywords'
+  );
+
+  const emptyQuestions = harness.buildOwnApiReportSchemaExample();
+  emptyQuestions.reverseQuestions = [' ', '\n'];
+  assert.throws(
+    () => harness.validateOwnApiDirectReport(emptyQuestions),
+    error => error.code === 'EMPTY_REVERSE_QUESTIONS' && error.fieldPath === 'reverseQuestions'
+  );
+
+  const wrongTextItem = harness.buildOwnApiReportSchemaExample();
+  const keywordMax = harness.AI_OUTPUT_LIMITS.arrays.jdKeywords.max;
+  wrongTextItem.keywords.jdKeywords = [
+    ...Array.from({ length: keywordMax }, (_, index) => `关键词 ${index}`),
+    42
+  ];
+  assert.throws(
+    () => harness.validateOwnApiDirectReport(wrongTextItem),
+    error => error.code === 'TYPE_MISMATCH' && error.fieldPath === 'keywords.jdKeywords[]'
+  );
+
+  const missingObjectField = harness.buildOwnApiReportSchemaExample();
+  const matchMax = harness.AI_OUTPUT_LIMITS.arrays.matches.max;
+  const validMatch = structuredClone(missingObjectField.matches[0]);
+  const invalidMatch = structuredClone(validMatch);
+  delete invalidMatch.reasoning;
+  missingObjectField.matches = [...Array.from({ length: matchMax }, () => structuredClone(validMatch)), invalidMatch];
+  assert.throws(
+    () => harness.validateOwnApiDirectReport(missingObjectField),
+    error => error.code === 'MISSING_FIELD' && error.fieldPath === `matches[].reasoning`
+  );
+
+  const longTail = harness.buildOwnApiReportSchemaExample();
+  longTail.keywords.jdKeywords = [
+    ...Array.from({ length: keywordMax }, (_, index) => `关键词 ${index}`),
+    '字'.repeat(harness.AI_OUTPUT_LIMITS.text.short + 1)
+  ];
+  assert.throws(
+    () => harness.validateOwnApiDirectReport(longTail),
+    error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'keywords.jdKeywords[]'
+  );
+});
+
+test('全部数组超限归一化后仍生成、展示并保存完整求职分析包', () => {
+  const harness = createHarness(async () => response(500, {}));
+  const content = harness.buildOwnApiReportSchemaExample();
+  BOUNDED_ARRAY_CASES.forEach(([path, limitKey, kind]) => {
+    const limit = harness.AI_OUTPUT_LIMITS.arrays[limitKey];
+    setValueAtPath(content, path, overLimitItems(valueAtPath(content, path), limit.max + 1, kind));
+  });
+  const diagnostics = [];
+  const result = harness.normalizeOwnApiResult(content, 'bounded-result-request', { jobTitle: '虚构岗位' }, diagnostics);
+  assert.equal(harness.assertCompleteApplicationPackage(result), result);
+  assert.equal(diagnostics.length, BOUNDED_ARRAY_CASES.length);
+  diagnostics.forEach(item => assert.deepEqual(Object.keys(item).sort(), ['code', 'fieldPath']));
+
+  const history = createHistoryHarness(
+    { experienceSummary: '虚构经历摘要', projectSummary: '', resumeText: '固定虚构简历' },
+    { jdText: '固定虚构 JD', jdConfirmed: true, jobTitle: '虚构岗位', screenshotFiles: [] },
+    '固定虚构 JD'
+  );
+  history.saveHistory(result);
+  const reloaded = harness.normalizeResult(history.records[0].result);
+  assert.equal(harness.assertCompleteApplicationPackage(reloaded), reloaded);
+  assert.equal(reloaded.keywordAnalysis.covered.length, harness.AI_OUTPUT_LIMITS.arrays.existingKeywords.max);
+});
+
 test('null 可空字段通过，空字符串、错误类型和输出上限明确失败', () => {
   const harness = createHarness(async () => response(500, {}));
   const base = harness.buildOwnApiReportSchemaExample();
@@ -346,9 +504,6 @@ test('null 可空字段通过，空字符串、错误类型和输出上限明确
   longText.outreachScripts.emailSubject = '字'.repeat(harness.AI_OUTPUT_LIMITS.text.emailSubject + 1);
   assert.throws(() => harness.validateOwnApiDirectReport(longText), error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'outreachScripts.emailSubject');
 
-  const longArray = structuredClone(base);
-  longArray.reverseQuestions = Array.from({ length: harness.AI_OUTPUT_LIMITS.arrays.reverseQuestions.max + 1 }, () => '有效问题？');
-  assert.throws(() => harness.validateOwnApiDirectReport(longArray), error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'reverseQuestions');
 });
 
 test('错误对象与用户提示只包含错误码和允许字段路径，不包含正文、输入或凭证', () => {
