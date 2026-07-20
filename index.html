@@ -760,7 +760,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
       <p>导入或粘贴简历，确认岗位 JD，再生成匹配评分、短板提醒、关键词缺失和修改建议，帮助求职者在投递前形成更清晰的判断。</p>
       <div class="hero-actions">
         <button class="primary-btn" type="button" onclick="scrollToAnalyzer()">开始一次匹配分析</button>
-        <button class="secondary-btn" type="button" onclick="fillExample()">随机填入示例</button>
+        <button class="secondary-btn" type="button" data-example-button onclick="fillExample()" disabled>随机填入示例</button>
       </div>
       <div class="hero-metrics" aria-label="产品能力概览">
         <div class="metric"><strong>4 步</strong><span>简历档案、确认 JD、选择模式、复用结果</span></div>
@@ -855,7 +855,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
             <h2>岗位匹配分析</h2>
             <p class="hint" id="analyzeHint">请先创建简历档案，再确认岗位 JD 文本。简历文件可在本地解析，岗位截图当前不做 OCR。</p>
           </div>
-          <button class="secondary-btn" type="button" onclick="fillExample()">填入示例</button>
+          <button class="secondary-btn" type="button" data-example-button onclick="fillExample()" disabled>填入示例</button>
         </div>
         <div class="flow-steps" aria-label="主流程步骤">
           <span>1 创建简历档案</span>
@@ -1279,7 +1279,7 @@ const SUPABASE_AUTH_CONFIG = {
 };
 
 const RELEASE_CONFIG = Object.freeze({
-  VERSION: 'v0.8.6c-g',
+  VERSION: 'v0.8.6c-h',
   MODE_SUMMARY: '未登录仅可使用本地演示；登录后可使用自带 DeepSeek Key 直连，平台 AI 仍在测试',
   UPDATED_AT: '2026-07-20'
 });
@@ -1324,6 +1324,8 @@ let lastJdTrackAt = 0;
 let supabaseAuthClient = null;
 let currentAuthSession = null;
 let ownApiRequestInFlight = false;
+let exampleResumePendingSave = false;
+let exampleJdPendingConfirm = false;
 const OTP_RESEND_SECONDS = 60;
 const otpLoginState = {
   email: '',
@@ -1386,23 +1388,44 @@ const JOB_MANUAL_FIELDS = [
   ['extraNotes', 'jobExtraNotes', '其他补充说明']
 ];
 
+function isExampleDraftPending() {
+  return exampleResumePendingSave || exampleJdPendingConfirm;
+}
+function resetExampleDraftState() {
+  exampleResumePendingSave = false;
+  exampleJdPendingConfirm = false;
+}
+function setExampleButtonsDisabled(disabled) {
+  document.querySelectorAll('[data-example-button]').forEach(button => {
+    button.disabled = Boolean(disabled);
+    button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+  });
+}
+function collectManualJobFormValues() {
+  return Object.fromEntries(JOB_MANUAL_FIELDS.map(([key, id]) => {
+    const el = $(id);
+    return [key, el ? el.value.trim() : ''];
+  }));
+}
+
 const exampleCases = [
 {
   title: '初级 AI 产品经理 / AI 产品助理',
-  resume: `张怡恒｜电子信息工程｜应届生
+  resume: `示例候选人 A｜虚构大学电子信息工程｜应届生
 求职方向：初级 AI 产品经理 / AI 产品助理
 
-教育背景：电子信息工程本科，学习过 Python、软件工程、计算机网络、嵌入式系统等课程。
+教育背景：虚构大学电子信息工程本科，学习过产品设计、软件工程和基础编程等示例课程。
 
 项目经历：
-1. AutoInsight AI：面向海外汽车商品企划岗位的 AI Agent，包含市场研究、竞品分析、用户画像、商品规划和结构化报告输出。
-2. ETF Agent：A 股 ETF 智能分析工具，支持 ETF 行情分析、均线信号、AI 技术分析报告和历史记录。
-3. 简历分析：简历与岗位 JD 匹配分析工具，设计了简历输入、岗位解析、匹配评分和修改建议流程。
+1. 智能任务助手示例项目：为虚构业务场景设计需求清单、用户流程和结构化报告输出。
+2. 学习计划助手示例项目：为虚构学习场景设计任务拆解、提醒和复盘功能。
+3. 岗位匹配示例项目：使用完全虚构的数据演示简历输入、岗位解析和结果展示流程。
 
-技能：Prompt 设计、AI Agent 流程设计、DeepSeek API、Streamlit、GitHub Pages、Figma、基础 Python。
+示例技能：需求拆解、流程设计、原型表达、基础数据分析和团队沟通。
 
-优势：能使用 GPT、Claude、Codex 等 AI 工具快速把业务想法做成可体验 Demo，理解 AI 产品从需求到上线的基本流程。`,
-  jd: `岗位名称：初级 AI 产品经理 / AI 产品助理
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：初级 AI 产品经理 / AI 产品助理
 
 岗位职责：
 1. 协助完成 AI 产品需求分析、竞品调研、用户流程设计和产品原型设计。
@@ -1424,20 +1447,21 @@ const exampleCases = [
 },
 {
   title: '数据产品助理',
-  resume: `李同学｜信息管理与信息系统｜应届生
+  resume: `示例候选人 B｜虚构大学信息管理与信息系统｜应届生
 求职方向：数据产品助理 / BI 产品助理
 
-教育背景：本科期间学习数据库原理、统计学、Python 数据分析、产品设计基础。
+教育背景：虚构大学信息管理与信息系统本科，学习数据库、统计和产品设计等示例课程。
 
 项目经历：
-1. 校园消费数据看板：整理食堂消费、用户分层和高峰时段数据，设计可视化看板和指标说明。
-2. 用户增长分析 Demo：用 Excel 和 Python 分析注册、活跃、留存数据，输出运营优化建议。
-3. 简历匹配工具体验优化：参与需求梳理，补充历史记录、导出和反馈入口。
+1. 校园数据看板示例项目：使用虚构数据设计指标口径、用户分层和可视化看板。
+2. 用户增长分析示例项目：使用虚构注册、活跃和留存数据输出分析建议。
+3. 表单体验优化示例项目：为虚构工具梳理历史记录、导出和反馈流程。
 
-技能：SQL 基础、Excel 透视表、Python pandas、数据指标拆解、需求文档、Axure、Figma。
+示例技能：基础 SQL、电子表格、数据指标拆解、需求文档和原型表达。
 
-优势：能把业务问题拆成指标和看板需求，理解数据产品需要兼顾口径、权限和业务解释。`,
-  jd: `岗位名称：数据产品助理
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：数据产品助理
 
 岗位职责：
 1. 协助梳理业务数据需求，设计数据指标、报表和看板原型。
@@ -1458,20 +1482,21 @@ const exampleCases = [
 },
 {
   title: '产品运营 / 用户运营',
-  resume: `王同学｜电子商务｜应届生
+  resume: `示例候选人 C｜虚构大学电子商务｜应届生
 求职方向：产品运营 / 用户运营
 
-教育背景：学习过用户运营、市场营销、消费者行为、数据分析基础。
+教育背景：虚构大学电子商务本科，学习用户运营、市场营销和数据分析等示例课程。
 
 项目经历：
-1. 小红书内容增长实验：围绕 AI 学习工具做选题、标题、封面和评论反馈整理。
-2. 社群运营方案：设计新用户入群欢迎、使用教程、反馈收集和活跃激励流程。
-3. 求职工具体验测试：从用户视角记录输入、等待、结果理解和导出流程中的问题。
+1. 内容增长示例项目：为虚构内容平台设计选题、标题和反馈整理流程。
+2. 社群运营示例项目：为虚构社群设计欢迎、教程、反馈和活跃流程。
+3. 工具体验测试示例项目：使用虚构任务记录输入、等待、结果理解和导出问题。
 
-技能：用户调研、内容运营、活动策划、Excel 数据整理、问卷设计、社群运营、基础产品体验分析。
+示例技能：用户调研、内容运营、活动策划、数据整理和基础体验分析。
 
-优势：理解用户从认知、试用到留存的完整路径，能把用户反馈转化为产品优化建议。`,
-  jd: `岗位名称：产品运营 / 用户运营
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：产品运营 / 用户运营
 
 岗位职责：
 1. 负责产品新用户引导、用户活跃、反馈收集和运营活动执行。
@@ -1492,20 +1517,21 @@ const exampleCases = [
 },
 {
   title: 'AIGC 内容运营',
-  resume: `陈同学｜新闻传播｜应届生
+  resume: `示例候选人 D｜虚构大学新闻传播｜应届生
 求职方向：AIGC 内容运营 / AI 内容产品运营
 
-教育背景：新闻传播本科，学习过新媒体运营、内容策划、传播学和用户研究。
+教育背景：虚构大学新闻传播本科，学习新媒体运营、内容策划和用户研究等示例课程。
 
 项目经历：
-1. AIGC 图文选题库：用 AI 工具生成不同人群的内容选题，并人工筛选优化。
-2. AI 写作 Prompt 模板：整理标题、摘要、种草文、教程文等内容模板。
-3. 内容效果复盘：追踪阅读、收藏、评论和转化数据，输出选题优化建议。
+1. 图文选题库示例项目：使用虚构受众标签生成选题并进行人工筛选。
+2. 写作模板示例项目：为虚构内容场景整理标题、摘要和教程模板。
+3. 内容复盘示例项目：使用虚构阅读和互动数据输出选题优化建议。
 
-技能：内容策划、Prompt 编写、公众号/小红书运营、数据复盘、用户反馈整理、基础图片设计。
+示例技能：内容策划、提示词编写、数据复盘、用户反馈整理和基础视觉表达。
 
-优势：能结合 AI 提升内容初稿效率，同时保留人工审核和风格把控。`,
-  jd: `岗位名称：AIGC 内容运营
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：AIGC 内容运营
 
 岗位职责：
 1. 使用 AI 工具辅助生成内容初稿、选题、标题和脚本。
@@ -1526,20 +1552,21 @@ const exampleCases = [
 },
 {
   title: 'AI 应用运营',
-  resume: `赵同学｜电子信息工程｜应届生
+  resume: `示例候选人 E｜虚构大学电子信息工程｜应届生
 求职方向：AI 应用运营 / AI 产品运营
 
-教育背景：电子信息工程本科，了解大模型工具、基础 Python 和产品迭代流程。
+教育背景：虚构大学电子信息工程本科，学习大模型工具、基础编程和产品迭代等示例课程。
 
 项目经历：
-1. AI 工具体验报告：对比多个 AI 搜索、写作和代码工具，整理功能差异和用户痛点。
-2. AI Agent Demo 运营方案：设计新用户教程、FAQ、反馈表和使用案例。
-3. 求职分析工具测试：记录 DeepSeek API 失败、Mock 兜底和用户输入异常场景。
+1. AI 工具体验示例项目：对比虚构工具的功能差异并整理示例用户反馈。
+2. 智能助手运营示例项目：为虚构应用设计教程、FAQ 和反馈表。
+3. 分析工具测试示例项目：使用合成输入验证失败提示、演示兜底和异常场景。
 
-技能：AI 工具测评、用户反馈整理、Prompt 调试、使用教程撰写、数据复盘、基础产品文档。
+示例技能：工具测评、用户反馈整理、提示词调试、教程撰写和数据复盘。
 
-优势：既能理解 AI 工具能力边界，也能从用户使用流程出发设计运营支持。`,
-  jd: `岗位名称：AI 应用运营
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：AI 应用运营
 
 岗位职责：
 1. 负责 AI 应用的新用户引导、使用教程、案例沉淀和反馈收集。
@@ -1560,20 +1587,21 @@ const exampleCases = [
 },
 {
   title: 'ToB SaaS 产品助理',
-  resume: `刘同学｜软件工程｜应届生
+  resume: `示例候选人 F｜虚构大学软件工程｜应届生
 求职方向：ToB SaaS 产品助理
 
-教育背景：软件工程本科，学习过软件需求分析、数据库、Web 开发和项目管理。
+教育背景：虚构大学软件工程本科，学习需求分析、数据库和项目管理等示例课程。
 
 项目经历：
-1. 课程管理系统原型：设计教师端、学生端、课程发布和作业管理流程。
-2. CRM 需求拆解练习：梳理线索、客户、跟进记录和销售漏斗字段。
-3. AI 求职工具项目：参与输入校验、历史记录、导出和反馈模块设计。
+1. 课程管理示例项目：为虚构校园设计角色、课程发布和作业管理流程。
+2. 客户管理示例项目：为虚构企业梳理线索、客户和跟进记录字段。
+3. 求职工具示例项目：使用合成数据设计输入校验、历史记录和反馈模块。
 
-技能：需求文档、流程图、原型设计、数据库字段理解、用户角色拆解、基础前端。
+示例技能：需求文档、流程图、原型设计、字段理解和用户角色拆解。
 
-优势：能理解 ToB 场景中的角色、权限、流程和数据字段，适合从产品助理做起。`,
-  jd: `岗位名称：ToB SaaS 产品助理
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：ToB SaaS 产品助理
 
 岗位职责：
 1. 协助完成企业客户需求调研、业务流程梳理和产品方案设计。
@@ -1594,20 +1622,21 @@ const exampleCases = [
 },
 {
   title: '数据分析助理',
-  resume: `孙同学｜统计学｜应届生
+  resume: `示例候选人 G｜虚构大学统计学｜应届生
 求职方向：数据分析助理
 
-教育背景：统计学本科，学习过概率论、数理统计、回归分析、Python 和 SQL 基础。
+教育背景：虚构大学统计学本科，学习概率、统计、基础编程和 SQL 等示例课程。
 
 项目经历：
-1. 用户行为分析：梳理访问、意向与留存路径，提出页面和活动优化建议。
-2. 用户留存分析：用 cohort 方法观察新用户留存变化，定位流失节点。
-3. 招聘 JD 分析：整理不同岗位关键词，分析能力要求差异。
+1. 用户行为分析示例项目：使用虚构访问和留存数据提出页面优化建议。
+2. 用户留存分析示例项目：使用合成 cohort 数据观察虚构用户留存变化。
+3. 岗位文本分析示例项目：使用公开虚构 JD 整理关键词和能力要求。
 
-技能：Excel、SQL 基础、Python pandas、数据可视化、指标体系、分析报告撰写。
+示例技能：电子表格、基础 SQL、数据可视化、指标体系和分析报告撰写。
 
-优势：能把业务问题转化为指标拆解，并用结构化报告说明分析结论。`,
-  jd: `岗位名称：数据分析助理
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：数据分析助理
 
 岗位职责：
 1. 根据业务需求提取、清洗和分析数据，输出分析报告。
@@ -1628,20 +1657,21 @@ const exampleCases = [
 },
 {
   title: '智能硬件产品助理',
-  resume: `周同学｜电子信息工程｜应届生
+  resume: `示例候选人 H｜虚构大学电子信息工程｜应届生
 求职方向：智能硬件产品助理
 
-教育背景：电子信息工程本科，学习过嵌入式系统、传感器、通信原理和产品设计基础。
+教育背景：虚构大学电子信息工程本科，学习嵌入式、传感器和产品设计等示例课程。
 
 项目经历：
-1. 智能台灯方案：梳理用户场景、亮度调节、定时和传感器触发逻辑。
-2. 设备 App 原型：设计设备绑定、状态查看、异常提醒和固件升级流程。
-3. AI 语音助手体验分析：整理语音交互失败场景和提示文案优化建议。
+1. 智能照明示例项目：为虚构设备梳理亮度、定时和传感器触发逻辑。
+2. 设备应用示例项目：为虚构设备设计绑定、状态查看和异常提醒流程。
+3. 语音助手体验示例项目：使用合成对话整理失败场景和提示文案建议。
 
-技能：硬件基础理解、用户场景拆解、原型设计、需求文档、测试用例、基础嵌入式知识。
+示例技能：硬件基础理解、用户场景拆解、原型设计、需求文档和测试用例。
 
-优势：有电子信息背景，能理解硬件约束，同时能从用户场景出发做产品方案。`,
-  jd: `岗位名称：智能硬件产品助理
+示例说明：以上身份、课程、项目、技能和成果均为完全虚构，仅用于演示产品流程。`,
+  jd: `公司名称：示例科技有限公司
+岗位名称：智能硬件产品助理
 
 岗位职责：
 1. 协助完成智能硬件产品需求分析、功能定义和原型设计。
@@ -1665,6 +1695,7 @@ const exampleCases = [
 init();
 function init() {
   localDataStore.beginAuthRestore();
+  setExampleButtonsDisabled(true);
   localDataStore.migrateLegacySensitiveData();
   renderReleaseInfo();
   getAnonymousUserId();
@@ -1676,8 +1707,8 @@ function init() {
   jobScreenshotInput.addEventListener('change', handleJobScreenshotUpload);
   const analyzerSection = $('analyzer');
   if (analyzerSection) {
-    analyzerSection.addEventListener('click', trackStartAnalysisArea, { once: true });
-    analyzerSection.addEventListener('focusin', trackStartAnalysisArea, { once: true });
+    analyzerSection.addEventListener('click', trackStartAnalysisArea);
+    analyzerSection.addEventListener('focusin', trackStartAnalysisArea);
   }
   JOB_MANUAL_FIELDS.forEach(([, id]) => {
     const el = $(id);
@@ -1826,6 +1857,8 @@ function renderLocalDataStatus() {
   `).join('');
 }
 function clearSensitivePageState() {
+  resetExampleDraftState();
+  setExampleButtonsDisabled(true);
   currentResult = null;
   currentRecordId = null;
   feedbackChoice = '';
@@ -1859,6 +1892,7 @@ function loadActiveScopeData() {
   renderAiModeState();
   renderLocalDataStatus();
   updateCounts();
+  setExampleButtonsDisabled(false);
 }
 function authConfigured() {
   return Boolean(
@@ -2281,6 +2315,7 @@ function saveAnalyticsQueue(queue) {
   localDataStore.writeDeviceJson(STORAGE.analyticsQueue, queue.slice(-500));
 }
 function trackStartAnalysisArea() {
+  if (isExampleDraftPending()) return;
   if (hasTrackedStartAnalysis) return;
   hasTrackedStartAnalysis = true;
   trackEvent('start_analysis', {
@@ -2369,7 +2404,8 @@ function matchScoreRange(score) {
   return 'below50';
 }
 function hasManualJobInfo() {
-  return JOB_MANUAL_FIELDS.some(([key]) => Boolean(getJobDraft()[key]));
+  const source = exampleJdPendingConfirm ? collectManualJobFormValues() : getJobDraft();
+  return JOB_MANUAL_FIELDS.some(([key]) => Boolean(source[key]));
 }
 function renderAnalyticsDashboard() {
   if (!analyticsDashboard) return;
@@ -2447,6 +2483,20 @@ function saveJobDraft(patch = {}, render = true) {
   renderLocalDataStatus();
   return draft;
 }
+function replaceJobDraft(value = {}, render = true) {
+  const now = new Date().toLocaleString();
+  const draft = normalizeJobDraft({
+    ...createEmptyJobDraft(),
+    ...value,
+    screenshotFiles: [],
+    createdAt: now,
+    updatedAt: now
+  });
+  if (!localDataStore.writeJson(STORAGE.jobDraft, draft)) return null;
+  if (render) renderJobDraftState(draft);
+  renderLocalDataStatus();
+  return draft;
+}
 function hydrateJobDraft() {
   const draft = getJobDraft();
   jdInput.value = draft.jdText || '';
@@ -2464,11 +2514,16 @@ function renderJobDraftState(draft = getJobDraft()) {
 }
 function handleJdTextChange() {
   updateCounts();
-  saveJobDraft({
-    jdText: jdInput.value,
-    jdConfirmed: false,
-    sourceType: 'paste'
-  });
+  if (exampleJdPendingConfirm) {
+    jdConfirmBadge.textContent = '示例 JD 未确认';
+    jdConfirmBadge.className = 'confirm-badge bad';
+  } else {
+    saveJobDraft({
+      jdText: jdInput.value,
+      jdConfirmed: false,
+      sourceType: 'paste'
+    });
+  }
   const now = Date.now();
   if (now - lastJdTrackAt > 1200) {
     lastJdTrackAt = now;
@@ -2480,6 +2535,11 @@ function handleJdTextChange() {
   }
 }
 function handleManualJobChange() {
+  if (exampleJdPendingConfirm) {
+    jdConfirmBadge.textContent = '示例 JD 未确认';
+    jdConfirmBadge.className = 'confirm-badge bad';
+    return;
+  }
   const patch = { jdConfirmed: false, sourceType: 'manual' };
   JOB_MANUAL_FIELDS.forEach(([key, id]) => {
     const el = $(id);
@@ -2496,12 +2556,14 @@ function syncManualJobInfoToJd() {
   const currentText = stripManualJobBlock(jdInput.value.trim());
   jdInput.value = currentText ? `${currentText}\n\n【手动补充岗位信息】\n${manualText}` : `【手动补充岗位信息】\n${manualText}`;
   updateCounts();
-  saveJobDraft({ jdText: jdInput.value, jdConfirmed: false, sourceType: 'manual' });
+  if (!exampleJdPendingConfirm) {
+    saveJobDraft({ jdText: jdInput.value, jdConfirmed: false, sourceType: 'manual' });
+  }
   setStatus('已将手动补充信息写入 JD 文本确认区，请检查后点击“确认 JD 文本”。');
   jdInput.focus();
 }
 function buildManualJobText() {
-  const draft = getJobDraft();
+  const draft = exampleJdPendingConfirm ? collectManualJobFormValues() : getJobDraft();
   return JOB_MANUAL_FIELDS
     .map(([key, , label]) => draft[key] ? `${label}：${draft[key]}` : '')
     .filter(Boolean)
@@ -2520,10 +2582,25 @@ function confirmJobDraft() {
   const jdText = jdInput.value.trim();
   if (jdText.length < 40) {
     setStatus('请先补充更完整的岗位 JD 文本，再确认。', 'error');
-    saveJobDraft({ jdText, jdConfirmed: false });
+    if (!exampleJdPendingConfirm) saveJobDraft({ jdText, jdConfirmed: false });
     return;
   }
-  saveJobDraft({ jdText, jdConfirmed: true });
+  if (exampleJdPendingConfirm) {
+    const manualValues = collectManualJobFormValues();
+    const draft = replaceJobDraft({
+      jdText,
+      jdConfirmed: true,
+      sourceType: Object.values(manualValues).some(Boolean) ? 'manual' : 'paste',
+      ...manualValues
+    });
+    if (!draft) {
+      setStatus('示例 JD 未能保存，请刷新页面后重试。', 'error');
+      return;
+    }
+    exampleJdPendingConfirm = false;
+  } else {
+    saveJobDraft({ jdText, jdConfirmed: true });
+  }
   trackEvent('jd_text_confirmed', {
     metadata: {
       jdLengthBucket: textLengthBucket(jdText),
@@ -2535,6 +2612,12 @@ function confirmJobDraft() {
 async function handleJobScreenshotUpload(event) {
   const files = [...(event.target.files || [])];
   if (!files.length) return;
+  if (exampleJdPendingConfirm) {
+    jobScreenshotInput.value = '';
+    screenshotStatus.textContent = '请先确认当前示例 JD，再上传岗位截图。';
+    screenshotStatus.className = 'status error';
+    return;
+  }
   const draft = getJobDraft();
   const current = draft.screenshotFiles || [];
   const accepted = [];
@@ -2636,6 +2719,13 @@ function removeJobScreenshot(index) {
   saveJobDraft({ screenshotFiles: files, jdConfirmed: false, sourceType: files.length ? 'screenshot' : draft.sourceType });
 }
 function clearJobScreenshots() {
+  if (exampleJdPendingConfirm) {
+    renderScreenshotList([]);
+    if (jobScreenshotInput) jobScreenshotInput.value = '';
+    screenshotStatus.textContent = '当前未保存示例不包含截图元数据。';
+    screenshotStatus.className = 'status';
+    return;
+  }
   saveJobDraft({ screenshotFiles: [], jdConfirmed: false });
   screenshotStatus.textContent = '已清空截图元信息。当前版本暂不自动识别截图文字，请复制岗位 JD 文本粘贴到上方确认区。';
   screenshotStatus.className = 'status';
@@ -2691,6 +2781,14 @@ function showProfileEditor(keepCurrent = false) {
   resumeInput.focus();
 }
 function hideProfileEditor() {
+  if (isExampleDraftPending()) {
+    resetExampleDraftState();
+    hydrateJobDraft();
+    renderResumeProfile();
+    if (ownApiDirectConsent) ownApiDirectConsent.checked = false;
+    setStatus('已取消未保存示例，正式简历档案和岗位草稿保持不变。');
+    return;
+  }
   const profile = getResumeProfile();
   if (!profile) {
     resumeInput.value = '';
@@ -2727,7 +2825,11 @@ function saveResumeProfile() {
     createdAt: existing?.createdAt || now,
     updatedAt: now
   };
-  localDataStore.writeJson(STORAGE.resumeProfile, profile);
+  if (!localDataStore.writeJson(STORAGE.resumeProfile, profile)) {
+    setStatus('简历档案未能保存，请刷新页面后重试。', 'error');
+    return false;
+  }
+  exampleResumePendingSave = false;
   renderResumeProfile();
   renderLocalDataStatus();
   trackEvent('resume_profile_created', {
@@ -2737,6 +2839,7 @@ function saveResumeProfile() {
     }
   });
   setStatus(existing ? '简历档案已更新，后续岗位分析将使用新档案。' : '简历档案已创建，后续分析岗位时无需重复上传。', 'success');
+  return true;
 }
 function deleteResumeProfile() {
   const ok = confirmAction('删除后，本地简历档案将被清空，后续分析需要重新上传简历。');
@@ -3040,17 +3143,51 @@ function clearApiKey() {
   });
   setStatus('已清除当前账号的自带 API Key。', 'success');
 }
+/* EXAMPLE_PRIVACY_START */
+function clearTransientStateForExample() {
+  JOB_MANUAL_FIELDS.forEach(([, id]) => {
+    const el = $(id);
+    if (el) el.value = '';
+  });
+  if (jobScreenshotInput) jobScreenshotInput.value = '';
+  if (resumeFileInput) resumeFileInput.value = '';
+  if (resumeFileMeta) resumeFileMeta.textContent = '';
+  if (resumeFileStatus) resumeFileStatus.textContent = '';
+  if (ownApiDirectConsent) ownApiDirectConsent.checked = false;
+  currentResult = null;
+  currentRecordId = null;
+  if (resultPanel) resultPanel.classList.remove('visible');
+  if (resultContent) resultContent.innerHTML = '';
+  if (progressBox) progressBox.classList.remove('active');
+  renderScreenshotList([]);
+  screenshotStatus.textContent = '示例未包含截图；旧截图元数据未带入当前临时表单。';
+  screenshotStatus.className = 'status';
+}
 function fillExample() {
+  if (!localDataStore.isAuthScopeReady()) {
+    setStatus('正在安全恢复本地数据，请稍后再填入示例。', 'error');
+    return;
+  }
   const example = exampleCases[Math.floor(Math.random() * exampleCases.length)];
+  clearTransientStateForExample();
   resumeInput.value = example.resume;
   jdInput.value = example.jd;
-  saveResumeProfile();
-  saveJobDraft({ jdText: example.jd, jdConfirmed: false, sourceType: 'paste' });
+  exampleResumePendingSave = true;
+  exampleJdPendingConfirm = true;
+  profileEditor.classList.add('visible');
+  profileView.innerHTML = '<div class="profile-empty">当前显示未保存的虚构示例；正式简历档案未修改。</div>';
+  jdConfirmBadge.textContent = '示例 JD 未确认';
+  jdConfirmBadge.className = 'confirm-badge bad';
+  analyzeHint.textContent = '当前为未保存示例。请主动保存简历档案并确认 JD 后再开始分析。';
   updateCounts();
-  setStatus(`已填入「${example.title}」示例，并生成本地简历档案。请先确认 JD 文本，再开始分析。`, 'success');
-  scrollToAnalyzer();
+  setStatus(`已填入「${example.title}」虚构示例，尚未写入正式档案。请主动保存简历并确认 JD。`, 'success');
+  $('analyzer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  resumeInput.focus();
 }
+/* EXAMPLE_PRIVACY_END */
 function clearInputs() {
+  const wasExamplePending = isExampleDraftPending();
+  resetExampleDraftState();
   jdInput.value = '';
   JOB_MANUAL_FIELDS.forEach(([, id]) => {
     const el = $(id);
@@ -3075,11 +3212,13 @@ function clearInputs() {
   screenshotStatus.className = 'status';
   updateCounts();
   resultPanel.classList.remove('visible');
+  if (wasExamplePending) renderResumeProfile();
   setStatus('已清空岗位 JD 草稿，简历档案仍保存在当前浏览器本地。');
 }
 function clearResumeProfileData() {
   const ok = confirmAction('确认清空当前数据空间中的简历档案吗？后续分析需要重新上传或粘贴简历。');
   if (!ok) return;
+  resetExampleDraftState();
   localDataStore.removeScoped(STORAGE.resumeProfile);
   resumeInput.value = '';
   renderResumeProfile();
@@ -3151,6 +3290,7 @@ function finishSteps() {
   for (let i = 0; i < 4; i++) $(`step${i}`).className = 'step done';
 }
 function validateInput() {
+  if (isExampleDraftPending()) return '当前示例尚未保存或确认。请先主动保存简历档案并确认 JD，再开始分析。';
   const profile = getResumeProfile();
   const draft = getJobDraft();
   if (!profile || !profile.resumeText || profile.resumeText.trim().length < 40) return '请先创建简历档案，再分析岗位。';

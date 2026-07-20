@@ -41,6 +41,7 @@
 - Supabase 仅可保存登录、匿名行为和未来由服务端管理的必要使用状态；前端不得使用 service role key。
 - Worker secrets 只能配置在 Cloudflare Worker 环境中，不能写入页面、文档或 Git。
 - Worker 与埋点不得记录简历原文、完整 JD、API Key、token、邮箱、手机号或模型原始响应。
+- “填入示例”只能使用仓库内经审计的明显虚构数据并覆盖页面临时态；认证 scope 恢复前必须禁用，用户主动保存简历并确认 JD 前不得写入正式档案或发起分析。
 
 ## 8.6B/8.6C 安全能力必须保留
 
