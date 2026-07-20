@@ -1707,8 +1707,8 @@ function init() {
   jobScreenshotInput.addEventListener('change', handleJobScreenshotUpload);
   const analyzerSection = $('analyzer');
   if (analyzerSection) {
-    analyzerSection.addEventListener('click', trackStartAnalysisArea, { once: true });
-    analyzerSection.addEventListener('focusin', trackStartAnalysisArea, { once: true });
+    analyzerSection.addEventListener('click', trackStartAnalysisArea);
+    analyzerSection.addEventListener('focusin', trackStartAnalysisArea);
   }
   JOB_MANUAL_FIELDS.forEach(([, id]) => {
     const el = $(id);
@@ -2315,6 +2315,7 @@ function saveAnalyticsQueue(queue) {
   localDataStore.writeDeviceJson(STORAGE.analyticsQueue, queue.slice(-500));
 }
 function trackStartAnalysisArea() {
+  if (isExampleDraftPending()) return;
   if (hasTrackedStartAnalysis) return;
   hasTrackedStartAnalysis = true;
   trackEvent('start_analysis', {

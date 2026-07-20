@@ -30,6 +30,11 @@ const draftEnd = html.indexOf('function hydrateJobDraft()', draftStart);
 if (draftStart < 0 || draftEnd < 0) throw new Error('无法定位岗位草稿替换模块');
 const draftSource = html.slice(draftStart, draftEnd);
 
+const trackerStart = html.indexOf('function trackStartAnalysisArea()');
+const trackerEnd = html.indexOf('function trackEvent(', trackerStart);
+if (trackerStart < 0 || trackerEnd < 0) throw new Error('无法定位分析区 analytics 门禁');
+const trackerSource = html.slice(trackerStart, trackerEnd);
+
 const JOB_MANUAL_FIELDS = [
   ['companyName', 'jobCompanyName'],
   ['jobTitle', 'jobTitle'],
@@ -51,14 +56,16 @@ const PRIVACY_SENTINELS = Object.freeze([
   'PRIVATE_SCREENSHOT_SENTINEL'
 ]);
 
-function element(initial = '') {
+function element(initial = '', parentNode = null) {
   const classes = new Set(['visible', 'active']);
-  return {
+  const listeners = new Map();
+  const node = {
     value: initial,
     textContent: initial,
     innerHTML: initial,
     checked: true,
     disabled: false,
+    parentNode,
     attributes: {},
     classList: {
       add: value => classes.add(value),
@@ -66,9 +73,34 @@ function element(initial = '') {
       contains: value => classes.has(value)
     },
     setAttribute(name, value) { this.attributes[name] = value; },
-    focus() {},
+    addEventListener(type, handler, options = {}) {
+      const rows = listeners.get(type) || [];
+      rows.push({ handler, once: options?.once === true });
+      listeners.set(type, rows);
+    },
+    dispatchEvent(event) {
+      const dispatched = typeof event === 'string' ? { type: event } : event;
+      if (!dispatched.target) dispatched.target = this;
+      let current = this;
+      while (current) {
+        const rows = [...(current.__listeners?.get(dispatched.type) || [])];
+        rows.forEach(row => {
+          row.handler.call(current, dispatched);
+          if (row.once) {
+            const active = current.__listeners.get(dispatched.type) || [];
+            current.__listeners.set(dispatched.type, active.filter(item => item !== row));
+          }
+        });
+        current = current.parentNode;
+      }
+      return true;
+    },
+    click() { return this.dispatchEvent({ type: 'click' }); },
+    focus() { return this.dispatchEvent({ type: 'focusin' }); },
     scrollIntoView() {}
   };
+  Object.defineProperty(node, '__listeners', { value: listeners });
+  return node;
 }
 
 function createFillHarness({ scopeReady = true, random = 0, scope = 'guest' } = {}) {
@@ -81,9 +113,12 @@ function createFillHarness({ scopeReady = true, random = 0, scope = 'guest' } = 
   };
   const storageBefore = structuredClone(storage);
   const storageCalls = [];
+  const analyzer = element();
+  const resumeInput = element(PRIVACY_SENTINELS[0], analyzer);
+  const exampleButton = element('', analyzer);
   const elements = Object.fromEntries([
-    ...JOB_MANUAL_FIELDS.map(([, id]) => [id, element(PRIVACY_SENTINELS[1])]),
-    ['analyzer', element()],
+    ...JOB_MANUAL_FIELDS.map(([, id]) => [id, element(PRIVACY_SENTINELS[1], analyzer)]),
+    ['analyzer', analyzer],
     ['profileView', element(PRIVACY_SENTINELS[0])]
   ]);
   const deps = {
@@ -91,10 +126,13 @@ function createFillHarness({ scopeReady = true, random = 0, scope = 'guest' } = 
     storageBefore,
     storageCalls,
     elements,
+    exampleButton,
     statusMessages: [],
+    trackerReads: { resumeProfile: 0, jobDraft: 0 },
+    analyticsEvents: [],
     screenshotRows: [PRIVACY_SENTINELS[5]],
-    resumeInput: element(PRIVACY_SENTINELS[0]),
-    jdInput: element(PRIVACY_SENTINELS[1]),
+    resumeInput,
+    jdInput: element(PRIVACY_SENTINELS[1], analyzer),
     jobScreenshotInput: element(PRIVACY_SENTINELS[5]),
     resumeFileInput: element(PRIVACY_SENTINELS[0]),
     resumeFileMeta: element(PRIVACY_SENTINELS[0]),
@@ -114,7 +152,8 @@ function createFillHarness({ scopeReady = true, random = 0, scope = 'guest' } = 
 
   const api = new Function('deps', `
     const {
-      storage, storageCalls, elements, statusMessages, screenshotRows, resumeInput, jdInput,
+      storage, storageCalls, elements, exampleButton, statusMessages, trackerReads, analyticsEvents,
+      screenshotRows, resumeInput, jdInput,
       jobScreenshotInput, resumeFileInput, resumeFileMeta, resumeFileStatus, ownApiDirectConsent,
       resultPanel, resultContent, progressBox, screenshotStatus, profileEditor, jdConfirmBadge,
       analyzeHint, exampleCases, scopeReady, random
@@ -135,12 +174,33 @@ function createFillHarness({ scopeReady = true, random = 0, scope = 'guest' } = 
     let currentRecordId = '${PRIVACY_SENTINELS[4]}';
     let exampleResumePendingSave = false;
     let exampleJdPendingConfirm = false;
+    let hasTrackedStartAnalysis = false;
+    const isExampleDraftPending = () => exampleResumePendingSave || exampleJdPendingConfirm;
+    const getResumeProfile = () => {
+      trackerReads.resumeProfile += 1;
+      return { resumeText: storage.resumeProfile };
+    };
+    const getJobDraft = () => {
+      trackerReads.jobDraft += 1;
+      return { jdText: storage.jobDraft, jdConfirmed: true };
+    };
+    const trackEvent = (eventType, options) => analyticsEvents.push({ eventType, options });
     const renderScreenshotList = rows => { screenshotRows.splice(0, screenshotRows.length, ...rows); };
     const updateCounts = () => {};
     const setStatus = (message, type = '') => statusMessages.push({ message, type });
+    ${trackerSource}
+    elements.analyzer.addEventListener('click', trackStartAnalysisArea);
+    elements.analyzer.addEventListener('focusin', trackStartAnalysisArea);
     ${privacySource}
+    exampleButton.addEventListener('click', fillExample);
     return {
       fillExample,
+      clickExample: () => exampleButton.click(),
+      focusResume: () => resumeInput.focus(),
+      finishPendingExample: () => {
+        exampleResumePendingSave = false;
+        exampleJdPendingConfirm = false;
+      },
       state: () => ({
         currentResult,
         currentRecordId,
@@ -153,6 +213,9 @@ function createFillHarness({ scopeReady = true, random = 0, scope = 'guest' } = 
         profileHtml: elements.profileView.innerHTML,
         screenshotRows: [...screenshotRows],
         consent: ownApiDirectConsent.checked,
+        trackerReads: { ...trackerReads },
+        analyticsCount: analyticsEvents.length,
+        hasTrackedStartAnalysis,
         statusMessages: [...statusMessages]
       })
     };
@@ -207,6 +270,37 @@ test('Guest、账号 A、账号 B 点击示例只覆盖临时 DOM，不读取或
     assert.deepEqual(state.screenshotRows, []);
     Object.values(state.manualValues).forEach(value => assert.equal(value, ''));
   });
+});
+
+test('真实 click、focus 和 focusin 冒泡在示例待保存期间不读取账号数据或发送 analytics', () => {
+  const harness = createFillHarness({ scope: 'user-a', random: 0 });
+  harness.clickExample();
+  let state = harness.state();
+  assert.deepEqual(state.trackerReads, { resumeProfile: 0, jobDraft: 0 });
+  assert.equal(state.analyticsCount, 0);
+  assert.equal(state.hasTrackedStartAnalysis, false);
+
+  harness.focusResume();
+  state = harness.state();
+  assert.deepEqual(state.trackerReads, { resumeProfile: 0, jobDraft: 0 });
+  assert.equal(state.analyticsCount, 0);
+
+  harness.finishPendingExample();
+  harness.focusResume();
+  state = harness.state();
+  assert.deepEqual(state.trackerReads, { resumeProfile: 1, jobDraft: 1 });
+  assert.equal(state.analyticsCount, 1);
+  assert.equal(state.hasTrackedStartAnalysis, true);
+
+  harness.focusResume();
+  assert.deepEqual(harness.state().trackerReads, { resumeProfile: 1, jobDraft: 1 });
+  assert.equal(harness.state().analyticsCount, 1);
+
+  assert.ok(trackerSource.indexOf('isExampleDraftPending()') < trackerSource.indexOf('getResumeProfile()'));
+  assert.ok(trackerSource.indexOf('isExampleDraftPending()') < trackerSource.indexOf('getJobDraft()'));
+  assert.match(html, /addEventListener\('click', trackStartAnalysisArea\);/);
+  assert.match(html, /addEventListener\('focusin', trackStartAnalysisArea\);/);
+  assert.doesNotMatch(html, /addEventListener\('(click|focusin)', trackStartAnalysisArea, \{ once: true \}\)/);
 });
 
 test('auth hydrate 未完成时函数拒绝填充，两个示例按钮默认禁用', () => {
