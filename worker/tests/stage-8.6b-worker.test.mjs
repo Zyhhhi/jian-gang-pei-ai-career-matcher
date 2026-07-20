@@ -40,7 +40,6 @@ function validPayload(requestId = 'request-12345678') {
 
 function validContent() {
   return {
-    generatedAt: '2026-07-14T08:00:00.000Z',
     jobSummary: { jobTitle: 'AI 产品助理', companyName: '示例科技', location: '上海', salary: null, educationRequirement: '本科', experienceRequirement: '应届生', coreResponsibilities: ['JD 要求负责 AI 产品需求分析和原型设计'], hardRequirements: ['JD 明确要求良好的沟通协作能力'] },
     recommendation: { recommendation: 'cautious', summary: '现有项目证据覆盖部分核心职责，仍需核实落地深度。', reasons: [{ kind: 'inference', statement: '项目方向部分匹配', evidence: '简历写有用户访谈、PRD 和原型设计', confidence: 78 }] },
     scores: { overall: 72, skills: 76, projects: 70, tools: 62, industry: 55, educationAndExperience: 74, rationale: [{ dimension: 'skills', score: 76, evidence: '简历写有用户访谈、PRD 和原型设计' }] },
@@ -264,16 +263,20 @@ test('DeepSeek request and sanitized Supabase diagnostics retain their security 
 
 test('Schema 1.2 validates business content, injects control fields and shares output limits', () => {
   const content = validContent();
-  const report = worker.validateAnalysisReport(content, { requestId: 'request-12345678', model: MODEL });
+  const applicationTime = Date.parse('2026-07-20T12:34:56.789Z');
+  const report = worker.validateAnalysisReport(content, { requestId: 'request-12345678', model: MODEL }, { now: () => applicationTime });
   assert.equal(report.schemaVersion, '1.2');
   assert.equal(report.requestId, 'request-12345678');
   assert.equal(report.model, MODEL);
+  assert.equal(report.generatedAt, '2026-07-20T12:34:56.789Z');
+  assert.equal(new Date(report.generatedAt).toISOString(), report.generatedAt);
   const example = worker.schemaExample();
   assert.equal(worker.validateAnalysisReport(example, { requestId: 'request-example', model: MODEL }).schemaVersion, '1.2');
   assert.equal('schemaVersion' in example, false);
+  assert.equal('generatedAt' in example, false);
   const prompt = worker.buildPrompt(validPayload().resumeProfile, validPayload().jobDraft);
   assert.match(prompt, /Do not rename, nest, alias, omit, or add fields/);
-  assert.doesNotMatch(prompt, /Set requestId|Set model|"schemaVersion"|"requestId"|"model"/);
+  assert.doesNotMatch(prompt, /Set requestId|Set model|"schemaVersion"|"requestId"|"model"|"generatedAt"/);
 
   const invalidReports = [
     value => { delete value.resumeRewrite; },
@@ -312,6 +315,23 @@ test('Schema 1.2 drops unknown fields without retaining names or values', () => 
   assert.deepEqual(diagnostics.map(item => item.code), ['UNEXPECTED_FIELD_DROPPED', 'UNEXPECTED_FIELD_DROPPED']);
   assert.deepEqual(diagnostics.map(item => item.fieldPath), ['outreachScripts', 'report']);
   assert.doesNotMatch(JSON.stringify(diagnostics), /privateRoot|privateNested|PRIVATE_UNKNOWN_VALUE|PRIVATE_NESTED_VALUE/);
+});
+
+test('Worker drops a model generatedAt and injects its own UTC timestamp', () => {
+  const content = validContent();
+  const forgedTime = '1900-01-01T00:00:00.000Z';
+  const applicationTime = Date.parse('2026-07-20T13:00:00.000Z');
+  content.generatedAt = forgedTime;
+  const diagnostics = [];
+  const report = worker.validateAnalysisReport(
+    content,
+    { requestId: 'request-forged-time', model: MODEL },
+    { diagnostics, now: () => applicationTime }
+  );
+  assert.equal(report.generatedAt, '2026-07-20T13:00:00.000Z');
+  assert.notEqual(report.generatedAt, forgedTime);
+  assert.deepEqual(diagnostics, [{ code: 'UNEXPECTED_FIELD_DROPPED', fieldPath: 'report' }]);
+  assert.equal(JSON.stringify(diagnostics).includes(forgedTime), false);
 });
 
 test('Schema 1.2 rejects aliases, wrong nesting, empty nullable strings and contract overflow', () => {

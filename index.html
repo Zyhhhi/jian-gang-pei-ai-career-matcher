@@ -3536,7 +3536,6 @@ function createOwnApiRequestId() {
 }
 function buildOwnApiReportSchemaExample() {
   return {
-    generatedAt: '2026-01-01T00:00:00.000Z',
     jobSummary: {
       jobTitle: null,
       companyName: null,
@@ -3639,7 +3638,7 @@ function buildOwnApiPrompt(profile, draft) {
   return [
     `Return exactly one JSON object containing the Schema ${OWN_API_CONFIG.SCHEMA_VERSION} business fields below.`,
     'Do not output Markdown, explanations, prefixes, suffixes, or additional fields.',
-    'Do not output schemaVersion, requestId, or model; the application adds those trusted control fields after validation.',
+    'Do not output schemaVersion, requestId, model, or generatedAt; the application adds those trusted metadata fields after validation.',
     'Use recommendation enum: recommended, cautious, not_recommended.',
     'Use reason kind enum: fact, inference, recommendation.',
     'Use matchLevel enum: strong, partial, weak, unknown.',
@@ -3786,11 +3785,10 @@ function validateOwnApiDirectReport(report, options = {}) {
   const diagnostics = Array.isArray(options.diagnostics) ? options.diagnostics : [];
   const projected = projectOwnApiAllowedContent(report, buildOwnApiReportSchemaExample(), 'report', diagnostics);
   const root = ownApiKeys(projected, [
-    'generatedAt', 'jobSummary', 'recommendation', 'scores', 'matches', 'risks', 'keywords',
+    'jobSummary', 'recommendation', 'scores', 'matches', 'risks', 'keywords',
     'resumeSuggestions', 'interviewPrep', 'resumeRewrite', 'outreachScripts',
     'selfIntroduction', 'reverseQuestions', 'trust'
   ], 'report');
-  if (typeof root.generatedAt !== 'string' || Number.isNaN(Date.parse(root.generatedAt))) ownApiFailure('TYPE_MISMATCH', 'generatedAt');
 
   const text = AI_OUTPUT_LIMITS.text;
   const arrays = AI_OUTPUT_LIMITS.arrays;
@@ -3926,12 +3924,13 @@ async function callOwnApiDirect(key, requestBody) {
     window.clearTimeout(timer);
   }
 }
-function injectOwnApiTrustedMetadata(content, requestId, model = OWN_API_CONFIG.MODEL) {
+function injectOwnApiTrustedMetadata(content, requestId, model = OWN_API_CONFIG.MODEL, generatedAt = new Date().toISOString()) {
   return {
     schemaVersion: OWN_API_CONFIG.SCHEMA_VERSION,
     requestId,
     ...content,
-    model
+    model,
+    generatedAt
   };
 }
 function normalizeOwnApiResult(content, requestId, draft, diagnostics = []) {

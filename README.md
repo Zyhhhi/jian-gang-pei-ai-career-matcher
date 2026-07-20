@@ -8,7 +8,7 @@
 - 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
 - 当前真实可用分析：本地规则 / Mock 分析，以及登录后的自带 DeepSeek Key 浏览器直连分析。
 - 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
-- 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；新的模型输出使用 Schema 1.2 有界业务内容契约，控制字段由应用注入，平台 AI 仍未开放。
+- 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；新的模型输出使用 Schema 1.2 有界业务内容契约，`schemaVersion`、`requestId`、`model` 和 UTC `generatedAt` 均由应用注入，平台 AI 仍未开放。
 - 当前平台 AI：前端已接线正式 Worker，但前端 `ENABLE_PLATFORM_AI=false`、Worker `PLATFORM_AI_ENABLED=false`，公开页面不会调用平台 Worker、DeepSeek 或真实额度 RPC。
 
 本地演示模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。

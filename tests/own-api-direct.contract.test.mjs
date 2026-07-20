@@ -149,6 +149,11 @@ test('自带 Key 与 Worker 使用同一份 Schema 1.2 内容结构和边界', (
   const harness = createHarness(async () => response(500, {}));
   const content = harness.buildOwnApiReportSchemaExample();
   assert.deepEqual(content, worker.schemaExample());
+  assert.deepEqual(Object.keys(content), [
+    'jobSummary', 'recommendation', 'scores', 'matches', 'risks', 'keywords',
+    'resumeSuggestions', 'interviewPrep', 'resumeRewrite', 'outreachScripts',
+    'selfIntroduction', 'reverseQuestions', 'trust'
+  ]);
   assert.deepEqual(harness.AI_OUTPUT_LIMITS, worker.AI_OUTPUT_LIMITS);
   assert.deepEqual(Object.keys(harness.AI_OUTPUT_LIMITS.arrays).sort(), [
     'coreResponsibilities', 'existingKeywords', 'hardRequirements', 'interviewItems',
@@ -163,17 +168,21 @@ test('自带 Key 与 Worker 使用同一份 Schema 1.2 内容结构和边界', (
   assert.equal('schemaVersion' in content, false);
   assert.equal('requestId' in content, false);
   assert.equal('model' in content, false);
+  assert.equal('generatedAt' in content, false);
   const prompt = harness.buildOwnApiPrompt({}, {});
-  assert.doesNotMatch(prompt, /Set requestId|Set model|"schemaVersion"|"requestId"|"model"/);
+  assert.doesNotMatch(prompt, /Set requestId|Set model|"schemaVersion"|"requestId"|"model"|"generatedAt"/);
   assert.match(prompt, /Array bounds:[\s\S]*reverse questions 1-4/);
   assert.match(prompt, /Text bounds in characters:[\s\S]*email subject\/email body\/attachment 360\/360\/100\/800\/240/);
   const parsed = harness.parseOwnApiModelJson(`\`\`\`json\n${JSON.stringify(content)}\n\`\`\``);
   assert.deepEqual(harness.validateOwnApiDirectReport(parsed), content);
 
-  const injected = harness.injectOwnApiTrustedMetadata(content, 'own-request-id', 'deepseek-v4-flash');
+  const applicationTime = '2026-07-20T12:34:56.789Z';
+  const injected = harness.injectOwnApiTrustedMetadata(content, 'own-request-id', 'deepseek-v4-flash', applicationTime);
   assert.equal(injected.schemaVersion, '1.2');
   assert.equal(injected.requestId, 'own-request-id');
   assert.equal(injected.model, 'deepseek-v4-flash');
+  assert.equal(injected.generatedAt, applicationTime);
+  assert.equal(new Date(injected.generatedAt).toISOString(), injected.generatedAt);
 });
 
 test('Schema 1.2 规范化后所有 UI 成品字段完整且不依赖 section 名称', () => {
@@ -253,6 +262,8 @@ test('完整结果保存并重新加载后不丢字段，历史不保存 Key、T
   assert.equal(harness.assertCompleteApplicationPackage(reloaded), reloaded);
   assert.deepEqual(reloaded.resumeRewrite, result.resumeRewrite);
   assert.deepEqual(reloaded.outreachScripts, result.outreachScripts);
+  assert.equal(history.records[0].result.trustDetails.generatedAt, result.trustDetails.generatedAt);
+  assert.equal(new Date(result.trustDetails.generatedAt).toISOString(), result.trustDetails.generatedAt);
 });
 
 test('401、截断输出和非 JSON 响应都以脱敏错误明确失败', async () => {
@@ -298,6 +309,24 @@ test('未知字段被投影丢弃，别名与错误嵌套仍因缺少允许字�
     () => harness.validateOwnApiDirectReport(nested),
     error => error.code === 'MISSING_FIELD' && error.fieldPath === 'resumeRewrite.summary'
   );
+});
+
+test('模型伪造 generatedAt 被丢弃，最终只使用应用 UTC 时间', () => {
+  const harness = createHarness(async () => response(500, {}));
+  const content = harness.buildOwnApiReportSchemaExample();
+  const forgedTime = '1900-01-01T00:00:00.000Z';
+  const applicationTime = '2026-07-20T13:00:00.000Z';
+  content.generatedAt = forgedTime;
+  const diagnostics = [];
+  const validated = harness.validateOwnApiDirectReport(content, { diagnostics });
+  assert.equal('generatedAt' in validated, false);
+  assert.deepEqual(diagnostics, [{ code: 'UNEXPECTED_FIELD_DROPPED', fieldPath: 'report' }]);
+  assert.equal(JSON.stringify(diagnostics).includes(forgedTime), false);
+
+  const report = harness.injectOwnApiTrustedMetadata(validated, 'own-request-id', 'deepseek-v4-flash', applicationTime);
+  assert.equal(report.generatedAt, applicationTime);
+  assert.notEqual(report.generatedAt, forgedTime);
+  assert.equal(new Date(report.generatedAt).toISOString(), report.generatedAt);
 });
 
 test('null 可空字段通过，空字符串、错误类型和输出上限明确失败', () => {

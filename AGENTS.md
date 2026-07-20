@@ -24,7 +24,7 @@
 - 真实 Supabase 邮件模板、邮件服务、OTP 过期时间、发送频率和真实收码登录均未在本阶段配置或验证。管理员只能按 `docs/supabase-email-otp-setup.md` 手动配置，不能把这些待办写成已完成。
 - 产品目标为 6 位验证码，但未读取真实后台配置；前端只接受数字而不固定长度。
 - 自带 DeepSeek API Key 已固定直连 `https://api.deepseek.com/chat/completions`，模型固定为 `deepseek-v4-flash`；Key 仅能通过 V2 本地存储访问层按已验证 Supabase `user.id` 空间保存，不能进入 URL、Prompt、历史、埋点、错误信息、Supabase、Worker 或代码仓库。Key 可在同一账号刷新后恢复，但登出、session 失效或账号切换时必须删除离开账号的 Key。
-- 新的真实模型请求使用 Schema 1.2 有界业务内容契约；模型不回显 `schemaVersion`、`requestId` 或 `model`，这些控制字段只在允许列表投影和严格校验成功后由应用注入。未知字段不得进入 UI 或历史，字段缺失、类型错误、空内容、超出边界或非正常结束均必须脱敏失败且不得自动重试。
+- 新的真实模型请求使用 Schema 1.2 有界业务内容契约；模型不回显 `schemaVersion`、`requestId`、`model` 或 `generatedAt`，这些程序元数据只在允许列表投影和严格校验成功后由应用注入，其中 `generatedAt` 必须为应用生成的 UTC ISO 8601 时间。未知字段不得进入 UI 或历史，字段缺失、类型错误、空内容、超出边界或非正常结束均必须脱敏失败且不得自动重试。
 - 自带 Key 调用前必须同时满足：已登录、已保存有效 Key、已确认简历与 JD 将直接发送给 DeepSeek；失败不得回退 Mock，只有通过本地 JSON 结构校验后才可渲染并写入本地历史。
 - 已由本地浏览器探针确认 DeepSeek 直连 CORS 可用；GitHub Pages 正式域名仍须在发布前做一次独立 CORS 验收。若正式域名 CORS 失败，停止该功能发布，不得引入代理。
 - 当前平台 AI 尚未公开开放；前端关闭门禁必须阻止 Worker 请求，服务端熔断必须阻止 Supabase Auth、V2 RPC 和 DeepSeek 调用。

@@ -615,7 +615,7 @@ export function buildPrompt(resumeProfile, jobDraft) {
   return [
     `Return exactly one JSON object containing the Schema ${ANALYSIS_SCHEMA_VERSION} business fields below.`,
     'Do not output Markdown, explanations, prefixes, suffixes, or additional fields.',
-    'Do not output schemaVersion, requestId, or model; the application adds those trusted control fields after validation.',
+    'Do not output schemaVersion, requestId, model, or generatedAt; the application adds those trusted metadata fields after validation.',
     'Use recommendation enum: recommended, cautious, not_recommended.',
     'Use reason kind enum: fact, inference, recommendation.',
     'Use matchLevel enum: strong, partial, weak, unknown.',
@@ -662,7 +662,6 @@ export function buildPrompt(resumeProfile, jobDraft) {
 
 export function schemaExample() {
   return {
-    generatedAt: '2026-01-01T00:00:00.000Z',
     jobSummary: {
       jobTitle: null,
       companyName: null,
@@ -811,11 +810,10 @@ export function validateAnalysisReport(content, expected, options = {}) {
   const report = projectAllowedModelContent(content, schemaExample(), 'report', diagnostics);
   assertObject(report, 'report');
   assertKeys(report, [
-    'generatedAt', 'jobSummary', 'recommendation', 'scores', 'matches', 'risks', 'keywords',
+    'jobSummary', 'recommendation', 'scores', 'matches', 'risks', 'keywords',
     'resumeSuggestions', 'interviewPrep', 'resumeRewrite', 'outreachScripts',
     'selfIntroduction', 'reverseQuestions', 'trust'
   ], 'report');
-  assertIsoDate(report.generatedAt, 'generatedAt');
 
   validateJobSummary(report.jobSummary);
   validateRecommendation(report.recommendation);
@@ -834,7 +832,8 @@ export function validateAnalysisReport(content, expected, options = {}) {
     schemaVersion: ANALYSIS_SCHEMA_VERSION,
     requestId: expected.requestId,
     ...report,
-    model: expected.model
+    model: expected.model,
+    generatedAt: new Date(typeof options.now === 'function' ? options.now() : Date.now()).toISOString()
   };
 }
 
@@ -1002,10 +1001,6 @@ function assertScore(value, path) {
 
 function assertEnum(value, options, path) {
   if (!options.includes(value)) schemaFailure('TYPE_MISMATCH', path);
-}
-
-function assertIsoDate(value, path) {
-  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) schemaFailure('TYPE_MISMATCH', path);
 }
 
 function isPlaceholder(value) {
