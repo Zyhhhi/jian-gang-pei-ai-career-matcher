@@ -365,11 +365,18 @@ test('Schema 1.2 rejects aliases, wrong nesting, empty nullable strings and cont
   );
 
   const tooManyQuestions = validContent();
-  tooManyQuestions.reverseQuestions = Array.from({ length: worker.AI_OUTPUT_LIMITS.arrays.reverseQuestions.max + 1 }, () => '有效问题？');
-  assert.throws(
-    () => worker.validateAnalysisReport(tooManyQuestions, { requestId: 'request-many-questions', model: MODEL }),
-    error => error.code === 'OUTPUT_LIMIT_EXCEEDED' && error.fieldPath === 'reverseQuestions'
+  tooManyQuestions.reverseQuestions = Array.from(
+    { length: worker.AI_OUTPUT_LIMITS.arrays.reverseQuestions.max + 1 },
+    (_, index) => `有效问题 ${index + 1}？`
   );
+  const diagnostics = [];
+  const normalized = worker.validateAnalysisReport(
+    tooManyQuestions,
+    { requestId: 'request-many-questions', model: MODEL },
+    { diagnostics }
+  );
+  assert.equal(normalized.reverseQuestions.length, worker.AI_OUTPUT_LIMITS.arrays.reverseQuestions.max);
+  assert.deepEqual(diagnostics, [{ code: 'ARRAY_ITEMS_TRUNCATED', fieldPath: 'reverseQuestions' }]);
 });
 
 test('Schema failures expose only fixed codes and allowlisted paths', () => {

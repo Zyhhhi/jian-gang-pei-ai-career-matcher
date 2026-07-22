@@ -815,19 +815,19 @@ export function validateAnalysisReport(content, expected, options = {}) {
     'selfIntroduction', 'reverseQuestions', 'trust'
   ], 'report');
 
-  validateJobSummary(report.jobSummary);
-  validateRecommendation(report.recommendation);
-  validateScores(report.scores);
-  assertArray(report.matches, 'matches', AI_OUTPUT_LIMITS.arrays.matches, validateMatch);
-  assertArray(report.risks, 'risks', AI_OUTPUT_LIMITS.arrays.risks, validateRisk);
-  validateKeywords(report.keywords);
-  assertArray(report.resumeSuggestions, 'resumeSuggestions', AI_OUTPUT_LIMITS.arrays.resumeSuggestions, validateResumeSuggestion);
-  validateInterviewPrep(report.interviewPrep);
+  validateJobSummary(report.jobSummary, diagnostics);
+  validateRecommendation(report.recommendation, diagnostics);
+  validateScores(report.scores, diagnostics);
+  report.matches = assertArray(report.matches, 'matches', AI_OUTPUT_LIMITS.arrays.matches, validateMatch, diagnostics);
+  report.risks = assertArray(report.risks, 'risks', AI_OUTPUT_LIMITS.arrays.risks, validateRisk, diagnostics);
+  validateKeywords(report.keywords, diagnostics);
+  report.resumeSuggestions = assertArray(report.resumeSuggestions, 'resumeSuggestions', AI_OUTPUT_LIMITS.arrays.resumeSuggestions, validateResumeSuggestion, diagnostics);
+  validateInterviewPrep(report.interviewPrep, diagnostics);
   validateResumeRewrite(report.resumeRewrite);
   validateOutreachScripts(report.outreachScripts);
   assertText(report.selfIntroduction, 'selfIntroduction', AI_OUTPUT_LIMITS.text.selfIntroduction);
-  assertTextArray(report.reverseQuestions, 'reverseQuestions', AI_OUTPUT_LIMITS.arrays.reverseQuestions, AI_OUTPUT_LIMITS.text.reverseQuestion);
-  validateTrust(report.trust);
+  report.reverseQuestions = assertTextArray(report.reverseQuestions, 'reverseQuestions', AI_OUTPUT_LIMITS.arrays.reverseQuestions, AI_OUTPUT_LIMITS.text.reverseQuestion, diagnostics);
+  validateTrust(report.trust, diagnostics);
   return {
     schemaVersion: ANALYSIS_SCHEMA_VERSION,
     requestId: expected.requestId,
@@ -837,7 +837,7 @@ export function validateAnalysisReport(content, expected, options = {}) {
   };
 }
 
-function validateJobSummary(value) {
+function validateJobSummary(value, diagnostics) {
   assertObject(value, 'jobSummary');
   assertKeys(value, [
     'jobTitle', 'companyName', 'location', 'salary', 'educationRequirement',
@@ -845,37 +845,37 @@ function validateJobSummary(value) {
   ], 'jobSummary');
   ['jobTitle', 'companyName', 'location', 'salary', 'educationRequirement', 'experienceRequirement']
     .forEach((key) => assertNullableText(value[key], `jobSummary.${key}`, AI_OUTPUT_LIMITS.text.standard));
-  assertTextArray(value.coreResponsibilities, 'jobSummary.coreResponsibilities', AI_OUTPUT_LIMITS.arrays.coreResponsibilities, AI_OUTPUT_LIMITS.text.evidence);
-  assertTextArray(value.hardRequirements, 'jobSummary.hardRequirements', AI_OUTPUT_LIMITS.arrays.hardRequirements, AI_OUTPUT_LIMITS.text.evidence);
+  value.coreResponsibilities = assertTextArray(value.coreResponsibilities, 'jobSummary.coreResponsibilities', AI_OUTPUT_LIMITS.arrays.coreResponsibilities, AI_OUTPUT_LIMITS.text.evidence, diagnostics);
+  value.hardRequirements = assertTextArray(value.hardRequirements, 'jobSummary.hardRequirements', AI_OUTPUT_LIMITS.arrays.hardRequirements, AI_OUTPUT_LIMITS.text.evidence, diagnostics);
 }
 
-function validateRecommendation(value) {
+function validateRecommendation(value, diagnostics) {
   assertObject(value, 'recommendation');
   assertKeys(value, ['recommendation', 'summary', 'reasons'], 'recommendation');
   assertEnum(value.recommendation, ['recommended', 'cautious', 'not_recommended'], 'recommendation.recommendation');
   assertText(value.summary, 'recommendation.summary', AI_OUTPUT_LIMITS.text.recommendationSummary);
-  assertArray(value.reasons, 'recommendation.reasons', AI_OUTPUT_LIMITS.arrays.recommendationReasons, (item, path) => {
+  value.reasons = assertArray(value.reasons, 'recommendation.reasons', AI_OUTPUT_LIMITS.arrays.recommendationReasons, (item, path) => {
     assertObject(item, path);
     assertKeys(item, ['kind', 'statement', 'evidence', 'confidence'], path);
     assertEnum(item.kind, ['fact', 'inference', 'recommendation'], `${path}.kind`);
     assertText(item.statement, `${path}.statement`, AI_OUTPUT_LIMITS.text.standard);
     assertText(item.evidence, `${path}.evidence`, AI_OUTPUT_LIMITS.text.evidence);
     assertScore(item.confidence, `${path}.confidence`);
-  });
+  }, diagnostics);
 }
 
-function validateScores(value) {
+function validateScores(value, diagnostics) {
   assertObject(value, 'scores');
   assertKeys(value, ['overall', 'skills', 'projects', 'tools', 'industry', 'educationAndExperience', 'rationale'], 'scores');
   ['overall', 'skills', 'projects', 'tools', 'industry', 'educationAndExperience']
     .forEach((key) => assertScore(value[key], `scores.${key}`));
-  assertArray(value.rationale, 'scores.rationale', AI_OUTPUT_LIMITS.arrays.scoreRationale, (item, path) => {
+  value.rationale = assertArray(value.rationale, 'scores.rationale', AI_OUTPUT_LIMITS.arrays.scoreRationale, (item, path) => {
     assertObject(item, path);
     assertKeys(item, ['dimension', 'score', 'evidence'], path);
     assertEnum(item.dimension, ['overall', 'skills', 'projects', 'tools', 'industry', 'educationAndExperience'], `${path}.dimension`);
     assertScore(item.score, `${path}.score`);
     assertText(item.evidence, `${path}.evidence`, AI_OUTPUT_LIMITS.text.evidence);
-  });
+  }, diagnostics);
 }
 
 function validateMatch(item, path) {
@@ -900,18 +900,18 @@ function validateRisk(item, path) {
   assertScore(item.confidence, `${path}.confidence`);
 }
 
-function validateKeywords(value) {
+function validateKeywords(value, diagnostics) {
   assertObject(value, 'keywords');
   assertKeys(value, ['jdKeywords', 'existingKeywords', 'missingKeywords'], 'keywords');
-  assertTextArray(value.jdKeywords, 'keywords.jdKeywords', AI_OUTPUT_LIMITS.arrays.jdKeywords, AI_OUTPUT_LIMITS.text.short);
-  assertTextArray(value.existingKeywords, 'keywords.existingKeywords', AI_OUTPUT_LIMITS.arrays.existingKeywords, AI_OUTPUT_LIMITS.text.short);
-  assertArray(value.missingKeywords, 'keywords.missingKeywords', AI_OUTPUT_LIMITS.arrays.missingKeywords, (item, path) => {
+  value.jdKeywords = assertTextArray(value.jdKeywords, 'keywords.jdKeywords', AI_OUTPUT_LIMITS.arrays.jdKeywords, AI_OUTPUT_LIMITS.text.short, diagnostics);
+  value.existingKeywords = assertTextArray(value.existingKeywords, 'keywords.existingKeywords', AI_OUTPUT_LIMITS.arrays.existingKeywords, AI_OUTPUT_LIMITS.text.short, diagnostics);
+  value.missingKeywords = assertArray(value.missingKeywords, 'keywords.missingKeywords', AI_OUTPUT_LIMITS.arrays.missingKeywords, (item, path) => {
     assertObject(item, path);
     assertKeys(item, ['keyword', 'status', 'reason'], path);
     assertText(item.keyword, `${path}.keyword`, AI_OUTPUT_LIMITS.text.short);
     assertEnum(item.status, ['can_add', 'needs_user_confirmation', 'do_not_add'], `${path}.status`);
     assertText(item.reason, `${path}.reason`, AI_OUTPUT_LIMITS.text.standard);
-  });
+  }, diagnostics);
 }
 
 function validateResumeSuggestion(item, path) {
@@ -928,10 +928,12 @@ function validateResumeSuggestion(item, path) {
   }
 }
 
-function validateInterviewPrep(value) {
+function validateInterviewPrep(value, diagnostics) {
   assertObject(value, 'interviewPrep');
   assertKeys(value, ['likelyQuestions', 'projectDeepDiveQuestions', 'weaknessQuestions', 'conceptsToReview', 'preparationAdvice'], 'interviewPrep');
-  Object.keys(value).forEach((key) => assertTextArray(value[key], `interviewPrep.${key}`, AI_OUTPUT_LIMITS.arrays.interviewItems, AI_OUTPUT_LIMITS.text.standard));
+  Object.keys(value).forEach((key) => {
+    value[key] = assertTextArray(value[key], `interviewPrep.${key}`, AI_OUTPUT_LIMITS.arrays.interviewItems, AI_OUTPUT_LIMITS.text.standard, diagnostics);
+  });
 }
 
 function validateResumeRewrite(value) {
@@ -952,12 +954,12 @@ function validateOutreachScripts(value) {
   assertText(value.attachmentReminder, 'outreachScripts.attachmentReminder', AI_OUTPUT_LIMITS.text.attachmentReminder);
 }
 
-function validateTrust(value) {
+function validateTrust(value, diagnostics) {
   assertObject(value, 'trust');
   assertKeys(value, ['overallConfidence', 'missingInformation', 'assumptions', 'evidenceCoverage'], 'trust');
   assertScore(value.overallConfidence, 'trust.overallConfidence');
-  assertTextArray(value.missingInformation, 'trust.missingInformation', AI_OUTPUT_LIMITS.arrays.trustItems, AI_OUTPUT_LIMITS.text.standard);
-  assertTextArray(value.assumptions, 'trust.assumptions', AI_OUTPUT_LIMITS.arrays.trustItems, AI_OUTPUT_LIMITS.text.standard);
+  value.missingInformation = assertTextArray(value.missingInformation, 'trust.missingInformation', AI_OUTPUT_LIMITS.arrays.trustItems, AI_OUTPUT_LIMITS.text.standard, diagnostics);
+  value.assumptions = assertTextArray(value.assumptions, 'trust.assumptions', AI_OUTPUT_LIMITS.arrays.trustItems, AI_OUTPUT_LIMITS.text.standard, diagnostics);
   assertScore(value.evidenceCoverage, 'trust.evidenceCoverage');
 }
 
@@ -973,15 +975,38 @@ function assertKeys(value, keys, path) {
   });
 }
 
-function assertArray(value, path, limits, validator) {
-  if (!Array.isArray(value)) schemaFailure('TYPE_MISMATCH', path);
-  if (value.length < limits.min) schemaFailure(path === 'reverseQuestions' ? 'EMPTY_REVERSE_QUESTIONS' : 'EMPTY_ARRAY', path);
-  if (value.length > limits.max) schemaFailure('OUTPUT_LIMIT_EXCEEDED', path);
-  value.forEach((item, index) => validator(item, `${path}[${index}]`));
+function recordArrayWarning(diagnostics, path) {
+  diagnostics.push(Object.freeze({ code: 'ARRAY_ITEMS_TRUNCATED', fieldPath: safeOutputPath(path) }));
 }
 
-function assertTextArray(value, path, limits, maxLength) {
-  assertArray(value, path, limits, (item, itemPath) => assertText(item, itemPath, maxLength));
+function assertArray(value, path, limits, validator, diagnostics) {
+  if (!Array.isArray(value)) schemaFailure('TYPE_MISMATCH', path);
+  value.forEach((item, index) => validator(item, `${path}[${index}]`));
+  const normalized = value.slice(0, limits.max);
+  if (value.length > limits.max) recordArrayWarning(diagnostics, path);
+  if (normalized.length < limits.min) schemaFailure(path === 'reverseQuestions' ? 'EMPTY_REVERSE_QUESTIONS' : 'EMPTY_ARRAY', path);
+  return normalized;
+}
+
+function assertTextArray(value, path, limits, maxLength, diagnostics) {
+  if (!Array.isArray(value)) schemaFailure('TYPE_MISMATCH', path);
+  const normalized = [];
+  const seen = new Set();
+  value.forEach((item, index) => {
+    const itemPath = `${path}[${index}]`;
+    if (typeof item !== 'string') schemaFailure('TYPE_MISMATCH', itemPath);
+    const trimmed = item.trim();
+    if (!trimmed) return;
+    assertText(trimmed, itemPath, maxLength);
+    if (!seen.has(trimmed)) {
+      seen.add(trimmed);
+      normalized.push(trimmed);
+    }
+  });
+  if (normalized.length > limits.max) recordArrayWarning(diagnostics, path);
+  const bounded = normalized.slice(0, limits.max);
+  if (bounded.length < limits.min) schemaFailure(path === 'reverseQuestions' ? 'EMPTY_REVERSE_QUESTIONS' : 'EMPTY_ARRAY', path);
+  return bounded;
 }
 
 function assertText(value, path, maxLength) {

@@ -53,6 +53,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - 用户自带 API Key 不写入 URL、Supabase、Worker 日志或代码仓库。
 - 自带 Key 固定请求 `https://api.deepseek.com/chat/completions`，固定模型 `deepseek-v4-flash`；不接受用户填写任意 Base URL。Key 只出现在浏览器到 DeepSeek 的 Authorization 请求头，不进入 Prompt、历史记录、埋点、错误信息或页面日志。
 - Schema 1.2 只要求模型生成允许列表内的业务字段；未知字段递归丢弃，必要字段缺失、类型错误、空内容或超出有界输出限制时均失败且不保存历史。
+- Schema 1.2 的受限数组会在全量项目校验后统一安全归一化：字符串数组去空、trim、稳定去重，全部数组超出最大数量时保留前 `max` 项并只产生脱敏 warning；非法项目、字符串超长或归一化后低于最小数量仍失败。
 - 本地浏览器 CORS 探针已由人工验证通过；GitHub Pages 正式域名发布前仍必须用用户本人临时 Key 完成一次 OPTIONS/POST 二次验收。若 CORS 失败，停止自带 Key 发布，不引入代理，也不回退 Mock。
 - 平台 AI 未开放前，前端不会把简历或 JD 发送到 Worker。
 
@@ -83,6 +84,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - `docs/release-0.8.6c-g.md`：v0.8.6C-G 完整 AI 输出契约 hotfix 记录。
 - `docs/release-0.8.6c-h.md`：v0.8.6C-H 示例数据隐私 hotfix 记录。
 - `docs/release-0.8.6c-i.md`：v0.8.6C-I AI 输出稳定性 hotfix 记录。
+- `docs/release-0.8.6c-j.md`：v0.8.6C-J 有界数组安全归一化 hotfix 记录。
 - `docs/supabase-email-otp-setup.md`：仅供管理员执行的 Supabase 邮件模板配置说明。
 - `docs/migrations/`：既有 Supabase schema 与 8.6B/8.6C 安全 migration；不得由前端执行。
 

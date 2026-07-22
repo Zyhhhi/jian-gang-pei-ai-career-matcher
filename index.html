@@ -1279,7 +1279,7 @@ const SUPABASE_AUTH_CONFIG = {
 };
 
 const RELEASE_CONFIG = Object.freeze({
-  VERSION: 'v0.8.6c-i',
+  VERSION: 'v0.8.6c-j',
   MODE_SUMMARY: '未登录仅可使用本地演示；登录后可使用自带 DeepSeek Key 直连，平台 AI 仍在测试',
   UPDATED_AT: '2026-07-20'
 });
@@ -3769,17 +3769,40 @@ function ownApiEnum(value, options, path) {
   if (!options.includes(value)) ownApiFailure('TYPE_MISMATCH', path);
   return value;
 }
-function ownApiArray(value, path, limits, validateItem) {
+function recordOwnApiArrayWarning(diagnostics, path) {
+  diagnostics.push(Object.freeze({ code: 'ARRAY_ITEMS_TRUNCATED', fieldPath: safeOwnApiFieldPath(path) }));
+}
+function ownApiArray(value, path, limits, validateItem, diagnostics) {
   if (!Array.isArray(value)) ownApiFailure('TYPE_MISMATCH', path);
-  if (value.length < limits.min) {
+  value.forEach((item, index) => validateItem(item, `${path}[${index}]`));
+  const normalized = value.slice(0, limits.max);
+  if (value.length > limits.max) recordOwnApiArrayWarning(diagnostics, path);
+  if (normalized.length < limits.min) {
     ownApiFailure(path === 'reverseQuestions' ? 'EMPTY_REVERSE_QUESTIONS' : 'EMPTY_ARRAY', path);
   }
-  if (value.length > limits.max) ownApiFailure('OUTPUT_LIMIT_EXCEEDED', path);
-  value.forEach((item, index) => validateItem(item, `${path}[${index}]`));
-  return value;
+  return normalized;
 }
-function ownApiTextArray(value, path, limits, maxLength) {
-  return ownApiArray(value, path, limits, (item, itemPath) => ownApiText(item, itemPath, maxLength));
+function ownApiTextArray(value, path, limits, maxLength, diagnostics) {
+  if (!Array.isArray(value)) ownApiFailure('TYPE_MISMATCH', path);
+  const normalized = [];
+  const seen = new Set();
+  value.forEach((item, index) => {
+    const itemPath = `${path}[${index}]`;
+    if (typeof item !== 'string') ownApiFailure('TYPE_MISMATCH', itemPath);
+    const trimmed = item.trim();
+    if (!trimmed) return;
+    ownApiText(trimmed, itemPath, maxLength);
+    if (!seen.has(trimmed)) {
+      seen.add(trimmed);
+      normalized.push(trimmed);
+    }
+  });
+  if (normalized.length > limits.max) recordOwnApiArrayWarning(diagnostics, path);
+  const bounded = normalized.slice(0, limits.max);
+  if (bounded.length < limits.min) {
+    ownApiFailure(path === 'reverseQuestions' ? 'EMPTY_REVERSE_QUESTIONS' : 'EMPTY_ARRAY', path);
+  }
+  return bounded;
 }
 function validateOwnApiDirectReport(report, options = {}) {
   const diagnostics = Array.isArray(options.diagnostics) ? options.diagnostics : [];
@@ -3795,38 +3818,38 @@ function validateOwnApiDirectReport(report, options = {}) {
   const jobSummary = ownApiKeys(root.jobSummary, ['jobTitle', 'companyName', 'location', 'salary', 'educationRequirement', 'experienceRequirement', 'coreResponsibilities', 'hardRequirements'], 'jobSummary');
   ['jobTitle', 'companyName', 'location', 'salary', 'educationRequirement', 'experienceRequirement']
     .forEach(key => ownApiText(jobSummary[key], `jobSummary.${key}`, text.standard, true));
-  ownApiTextArray(jobSummary.coreResponsibilities, 'jobSummary.coreResponsibilities', arrays.coreResponsibilities, text.evidence);
-  ownApiTextArray(jobSummary.hardRequirements, 'jobSummary.hardRequirements', arrays.hardRequirements, text.evidence);
+  jobSummary.coreResponsibilities = ownApiTextArray(jobSummary.coreResponsibilities, 'jobSummary.coreResponsibilities', arrays.coreResponsibilities, text.evidence, diagnostics);
+  jobSummary.hardRequirements = ownApiTextArray(jobSummary.hardRequirements, 'jobSummary.hardRequirements', arrays.hardRequirements, text.evidence, diagnostics);
 
   const recommendation = ownApiKeys(root.recommendation, ['recommendation', 'summary', 'reasons'], 'recommendation');
   ownApiEnum(recommendation.recommendation, ['recommended', 'cautious', 'not_recommended'], 'recommendation.recommendation');
   ownApiText(recommendation.summary, 'recommendation.summary', text.recommendationSummary);
-  ownApiArray(recommendation.reasons, 'recommendation.reasons', arrays.recommendationReasons, (item, path) => {
+  recommendation.reasons = ownApiArray(recommendation.reasons, 'recommendation.reasons', arrays.recommendationReasons, (item, path) => {
     const value = ownApiKeys(item, ['kind', 'statement', 'evidence', 'confidence'], path);
     ownApiEnum(value.kind, ['fact', 'inference', 'recommendation'], `${path}.kind`);
     ownApiText(value.statement, `${path}.statement`, text.standard);
     ownApiText(value.evidence, `${path}.evidence`, text.evidence);
     ownApiScore(value.confidence, `${path}.confidence`);
-  });
+  }, diagnostics);
 
   const scores = ownApiKeys(root.scores, ['overall', 'skills', 'projects', 'tools', 'industry', 'educationAndExperience', 'rationale'], 'scores');
   ['overall', 'skills', 'projects', 'tools', 'industry', 'educationAndExperience'].forEach(key => ownApiScore(scores[key], `scores.${key}`));
-  ownApiArray(scores.rationale, 'scores.rationale', arrays.scoreRationale, (item, path) => {
+  scores.rationale = ownApiArray(scores.rationale, 'scores.rationale', arrays.scoreRationale, (item, path) => {
     const value = ownApiKeys(item, ['dimension', 'score', 'evidence'], path);
     ownApiEnum(value.dimension, ['overall', 'skills', 'projects', 'tools', 'industry', 'educationAndExperience'], `${path}.dimension`);
     ownApiScore(value.score, `${path}.score`);
     ownApiText(value.evidence, `${path}.evidence`, text.evidence);
-  });
+  }, diagnostics);
 
-  ownApiArray(root.matches, 'matches', arrays.matches, (item, path) => {
+  root.matches = ownApiArray(root.matches, 'matches', arrays.matches, (item, path) => {
     const value = ownApiKeys(item, ['jdRequirement', 'resumeEvidence', 'matchLevel', 'reasoning', 'confidence'], path);
     ownApiText(value.jdRequirement, `${path}.jdRequirement`, text.evidence);
     ownApiText(value.resumeEvidence, `${path}.resumeEvidence`, text.evidence);
     ownApiEnum(value.matchLevel, ['strong', 'partial', 'weak', 'unknown'], `${path}.matchLevel`);
     ownApiText(value.reasoning, `${path}.reasoning`, text.standard);
     ownApiScore(value.confidence, `${path}.confidence`);
-  });
-  ownApiArray(root.risks, 'risks', arrays.risks, (item, path) => {
+  }, diagnostics);
+  root.risks = ownApiArray(root.risks, 'risks', arrays.risks, (item, path) => {
     const value = ownApiKeys(item, ['type', 'jdEvidence', 'resumeEvidence', 'conclusion', 'canImproveShortTerm', 'interviewAdvice', 'confidence'], path);
     ownApiEnum(value.type, ['hard_requirement', 'skill_gap', 'experience_gap', 'information_missing', 'interview_risk'], `${path}.type`);
     ownApiText(value.jdEvidence, `${path}.jdEvidence`, text.evidence);
@@ -3835,18 +3858,18 @@ function validateOwnApiDirectReport(report, options = {}) {
     if (typeof value.canImproveShortTerm !== 'boolean') ownApiFailure('TYPE_MISMATCH', `${path}.canImproveShortTerm`);
     ownApiText(value.interviewAdvice, `${path}.interviewAdvice`, text.standard);
     ownApiScore(value.confidence, `${path}.confidence`);
-  });
+  }, diagnostics);
 
   const keywords = ownApiKeys(root.keywords, ['jdKeywords', 'existingKeywords', 'missingKeywords'], 'keywords');
-  ownApiTextArray(keywords.jdKeywords, 'keywords.jdKeywords', arrays.jdKeywords, text.short);
-  ownApiTextArray(keywords.existingKeywords, 'keywords.existingKeywords', arrays.existingKeywords, text.short);
-  ownApiArray(keywords.missingKeywords, 'keywords.missingKeywords', arrays.missingKeywords, (item, path) => {
+  keywords.jdKeywords = ownApiTextArray(keywords.jdKeywords, 'keywords.jdKeywords', arrays.jdKeywords, text.short, diagnostics);
+  keywords.existingKeywords = ownApiTextArray(keywords.existingKeywords, 'keywords.existingKeywords', arrays.existingKeywords, text.short, diagnostics);
+  keywords.missingKeywords = ownApiArray(keywords.missingKeywords, 'keywords.missingKeywords', arrays.missingKeywords, (item, path) => {
     const value = ownApiKeys(item, ['keyword', 'status', 'reason'], path);
     ownApiText(value.keyword, `${path}.keyword`, text.short);
     ownApiEnum(value.status, ['can_add', 'needs_user_confirmation', 'do_not_add'], `${path}.status`);
     ownApiText(value.reason, `${path}.reason`, text.standard);
-  });
-  ownApiArray(root.resumeSuggestions, 'resumeSuggestions', arrays.resumeSuggestions, (item, path) => {
+  }, diagnostics);
+  root.resumeSuggestions = ownApiArray(root.resumeSuggestions, 'resumeSuggestions', arrays.resumeSuggestions, (item, path) => {
     const value = ownApiKeys(item, ['section', 'originalText', 'issue', 'suggestedText', 'reason', 'evidenceStatus'], path);
     ownApiText(value.section, `${path}.section`, text.short);
     ownApiText(value.originalText, `${path}.originalText`, text.evidence, true);
@@ -3854,9 +3877,11 @@ function validateOwnApiDirectReport(report, options = {}) {
     ownApiText(value.suggestedText, `${path}.suggestedText`, text.evidence);
     ownApiText(value.reason, `${path}.reason`, text.standard);
     ownApiEnum(value.evidenceStatus, ['supported', 'needs_user_confirmation', 'unsupported'], `${path}.evidenceStatus`);
-  });
+  }, diagnostics);
   const interviewPrep = ownApiKeys(root.interviewPrep, ['likelyQuestions', 'projectDeepDiveQuestions', 'weaknessQuestions', 'conceptsToReview', 'preparationAdvice'], 'interviewPrep');
-  Object.keys(interviewPrep).forEach(key => ownApiTextArray(interviewPrep[key], `interviewPrep.${key}`, arrays.interviewItems, text.standard));
+  Object.keys(interviewPrep).forEach(key => {
+    interviewPrep[key] = ownApiTextArray(interviewPrep[key], `interviewPrep.${key}`, arrays.interviewItems, text.standard, diagnostics);
+  });
   const resumeRewrite = ownApiKeys(root.resumeRewrite, ['summary', 'projectExample', 'skillsExample'], 'resumeRewrite');
   ownApiText(resumeRewrite.summary, 'resumeRewrite.summary', text.resumeSummary);
   ownApiText(resumeRewrite.projectExample, 'resumeRewrite.projectExample', text.projectExample);
@@ -3868,11 +3893,11 @@ function validateOwnApiDirectReport(report, options = {}) {
   ownApiText(outreachScripts.emailBody, 'outreachScripts.emailBody', text.emailBody);
   ownApiText(outreachScripts.attachmentReminder, 'outreachScripts.attachmentReminder', text.attachmentReminder);
   ownApiText(root.selfIntroduction, 'selfIntroduction', text.selfIntroduction);
-  ownApiTextArray(root.reverseQuestions, 'reverseQuestions', arrays.reverseQuestions, text.reverseQuestion);
+  root.reverseQuestions = ownApiTextArray(root.reverseQuestions, 'reverseQuestions', arrays.reverseQuestions, text.reverseQuestion, diagnostics);
   const trust = ownApiKeys(root.trust, ['overallConfidence', 'missingInformation', 'assumptions', 'evidenceCoverage'], 'trust');
   ownApiScore(trust.overallConfidence, 'trust.overallConfidence');
-  ownApiTextArray(trust.missingInformation, 'trust.missingInformation', arrays.trustItems, text.standard);
-  ownApiTextArray(trust.assumptions, 'trust.assumptions', arrays.trustItems, text.standard);
+  trust.missingInformation = ownApiTextArray(trust.missingInformation, 'trust.missingInformation', arrays.trustItems, text.standard, diagnostics);
+  trust.assumptions = ownApiTextArray(trust.assumptions, 'trust.assumptions', arrays.trustItems, text.standard, diagnostics);
   ownApiScore(trust.evidenceCoverage, 'trust.evidenceCoverage');
   return root;
 }

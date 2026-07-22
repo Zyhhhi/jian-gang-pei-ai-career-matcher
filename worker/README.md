@@ -100,6 +100,7 @@ wrangler deploy
 - 可用次数不足、登录失败、输入过长、重复请求和限流不会调用模型。
 - Provider 失败、超时、空内容、非 JSON 和 Schema 失败会恢复已预留次数。
 - 成功结果必须通过 Schema 1.2 的必填字段、类型、枚举、分数、非空与输出边界校验；模型不再回显 `schemaVersion`、`requestId`、`model` 或 `generatedAt`，未知字段会按允许列表丢弃且不进入 UI 或历史。
+- 所有受限数组统一在全量项目校验后归一化；纯字符串数组先去空、trim、稳定去重，再保留前 `max` 项。数组安全截取只产生不含内容和数量的 `ARRAY_ITEMS_TRUNCATED` warning，归一化后低于 `min` 或任一项目非法仍失败。
 - 简历与 JD 被包裹在明确的数据边界内，内容中的指令不会被视为系统指令。
 - `PLATFORM_AI_ENABLED` 缺失或未严格设为 `true` 时，POST 在认证、额度 RPC 与模型调用之前返回 `503 PLATFORM_AI_DISABLED`；OPTIONS 仍可用于 CORS 健康检查。
 
