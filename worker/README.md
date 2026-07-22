@@ -13,6 +13,7 @@
 - 已配置 Secret 名称：`DEEPSEEK_API_KEY`、`SUPABASE_SERVICE_ROLE_KEY`；不得记录或输出值
 - V2 migration 已在真实 Supabase 执行一次并完成函数、RLS 与最小权限验收，不得重复执行
 - 已完成一次受控真实后端调用；Worker、DeepSeek 与 V2 日/月计数链路成功，随后服务端开关已恢复为 `false`
+- v0.8.6c-k 的 Worker-only 稳定性修复尚未部署。此前受控请求曾分别出现 `MODEL_TIMEOUT` 与上游 HTTP 200 后的 `OUTPUT_TRUNCATED`；两次均通过 V2 RPC 退款，未增加成功次数。
 
 本地 `worker/wrangler.toml` 被 `.gitignore` 忽略。任何再次部署前都必须先确认该文件不会覆盖 Dashboard 中已验证的 CORS Origin 配置。
 
@@ -28,7 +29,7 @@
 - `ALLOWED_ORIGIN`：允许访问 Worker 的前端域名，例如 GitHub Pages 域名
 - `PLATFORM_AI_ENABLED`：普通 Worker 配置，严格为字符串 `true` 时才允许分析 POST；缺失、`false` 或任何其他值都会返回 `503 PLATFORM_AI_DISABLED`，并且不访问 Supabase 或 DeepSeek。部署和受控验收前必须保持 `false`。
 - `DEEPSEEK_MODEL`：默认 `deepseek-v4-pro`
-- `MODEL_TIMEOUT_MS`：可选，默认 `60000`，允许范围 10 到 120000 毫秒
+- `MODEL_TIMEOUT_MS`：可选，代码默认 `60000`，允许范围 10 到 120000 毫秒。生产 Dashboard 当前已人工设为 `120000`；代码不得写死或覆盖该 Dashboard 配置。
 
 `SUPABASE_SERVICE_ROLE_KEY` 只能放在 Worker 环境变量中，不能放到前端。
 
@@ -117,4 +118,8 @@ Worker 会先尝试解析模型返回的 JSON；如果模型包裹了 Markdown c
 如果解析或 Schema 校验失败，Worker 返回 `INVALID_MODEL_OUTPUT`，并通过 `refund_platform_ai_quota_v2` 将请求从失败状态转换为 `refunded`。模型完整原始返回不会写入 `usage_events` 或 `ai_requests`。
 ## DeepSeek 输出参数
 
-Worker 使用 `DEEPSEEK_MODEL`，默认 `deepseek-v4-pro`。请求使用 `response_format: { type: "json_object" }`、`thinking: { type: "enabled" }` 和顶层 `reasoning_effort: "high"`。thinking mode 下未发送官方说明会被忽略的 `temperature`。请求由 `AbortController` 在约 60 秒后中止，本阶段不自动重试，避免重复模型费用。
+Worker 使用 `DEEPSEEK_MODEL`，默认 `deepseek-v4-pro`。v0.8.6c-k 请求使用 `response_format: { type: "json_object" }`、`thinking: { type: "disabled" }` 与 `max_tokens: 8192`，不发送 `reasoning_effort` 或 `temperature`。请求由 `AbortController` 按 Dashboard 的 `MODEL_TIMEOUT_MS` 中止，本阶段不自动重试，避免重复模型费用。该代码尚未部署，受控验收前服务端开关必须继续为 `false`。
+
+## v0.8.6c-k 可观测性边界
+
+若上游实际返回 usage，Worker 只会在失败响应中携带 allowlist 数值诊断：`finishReason`、`totalTokens`、`completionTokens`、`reasoningTokens` 与 `durationMs`。usage 缺失不影响主流程；这些诊断不会写入历史、数据库或日志，且绝不包含 Prompt、模型正文、简历、JD、Key、Token 或任意字段值。

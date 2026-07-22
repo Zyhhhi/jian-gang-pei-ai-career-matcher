@@ -16,7 +16,7 @@
 ## 当前真实实现边界
 
 - `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 必须保持 `false`，不得公开打开。
-- 正式 Worker `jian-gang-pei-platform-ai` 已部署，入口为 `worker/index.js`，接口为 `https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`。根目录 `cloudflare-worker.js` 仅为历史禁用入口。
+- 正式 Worker `jian-gang-pei-platform-ai` 已部署，入口为 `worker/index.js`，接口为 `https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`。根目录 `cloudflare-worker.js` 仅为历史禁用入口。v0.8.6c-k 的 Worker-only 稳定性修复尚未部署。
 - 前端已接线正式 Worker 地址，但 `ENABLE_PLATFORM_AI` 继续为 `false`。Worker 的 `PLATFORM_AI_ENABLED` 是独立的服务端紧急熔断开关，当前也为 `false`；缺失或除严格字符串 `true` 外的任何值均视为关闭。关闭时平台分析 POST 必须在 Supabase Auth、V2 RPC 和 DeepSeek 之前返回 `503 PLATFORM_AI_DISABLED`，但 OPTIONS/CORS 预检必须继续可用。
 - 正式 Worker 已配置 `DEEPSEEK_API_KEY` 与 `SUPABASE_SERVICE_ROLE_KEY` 两个 Secret；只能记录名称，绝不能输出、复制或写入其值。实际部署前必须确认被 `.gitignore` 忽略的 `worker/wrangler.toml` 不会覆盖 Dashboard 中已验证的 CORS Origin 配置。
 - `SUPABASE_AUTH_CONFIG.LOGIN_MODE` 是登录模式唯一事实来源，当前必须为 `magic_link`。正式发布使用 `signInWithOtp({ email, options: { emailRedirectTo } })`；redirect 由当前 HTTP(S) 页面路径生成，不得硬编码本地地址。
@@ -30,7 +30,7 @@
 - 已由本地浏览器探针确认 DeepSeek 直连 CORS 可用；GitHub Pages 正式域名仍须在发布前做一次独立 CORS 验收。若正式域名 CORS 失败，停止该功能发布，不得引入代理。
 - 当前平台 AI 尚未公开开放；前端关闭门禁必须阻止 Worker 请求，服务端熔断必须阻止 Supabase Auth、V2 RPC 和 DeepSeek 调用。
 - V2 migration 已在真实 Supabase 执行一次；V2 RPC、RLS、函数 owner、`SECURITY DEFINER`、`search_path` 和最小权限均已人工验收，不得重复执行 migration。
-- 已完成一次受控真实后端调用，Worker、DeepSeek 与 V2 日/月计数链路均成功；验收后已立即恢复 `PLATFORM_AI_ENABLED=false`。该结果只证明后端闭环可用，不代表平台 AI 已公开开放。
+- 已完成一次受控真实后端调用，Worker、DeepSeek 与 V2 日/月计数链路均成功；验收后已立即恢复 `PLATFORM_AI_ENABLED=false`。后续两次 v0.8.6c-j 受控请求分别得到 `MODEL_TIMEOUT` 与上游 HTTP 200 后的 `OUTPUT_TRUNCATED`；两次均已退款，日/月 `reserved_count` 已归零且未增加成功次数。该结果只证明后端闭环与退款链路可用，不代表平台 AI 已公开开放。
 
 ## 数据安全边界
 
@@ -43,6 +43,7 @@
 - Supabase 仅可保存登录、匿名行为和未来由服务端管理的必要使用状态；前端不得使用 service role key。
 - Worker secrets 只能配置在 Cloudflare Worker 环境中，不能写入页面、文档或 Git。
 - Worker 与埋点不得记录简历原文、完整 JD、API Key、token、邮箱、手机号或模型原始响应。
+- Worker 若返回上游 usage 诊断，只可保留 allowlist 数值（完成原因、总 token、输出 token、推理 token、耗时）；不得记录模型正文、Prompt、简历、JD、Key、Token 或任何字段值。
 - “填入示例”只能使用仓库内经审计的明显虚构数据并覆盖页面临时态；认证 scope 恢复前必须禁用，用户主动保存简历并确认 JD 前不得写入正式档案或发起分析。
 
 ## 8.6B/8.6C 安全能力必须保留
@@ -54,6 +55,7 @@
 - 保留旧原子预留、处理、成功确认、失败恢复、stale 恢复与 requestId 幂等 RPC，供历史数据兼容；新 Worker 只能使用 V2 RPC。
 - 保留输入长度限制、限流、严格 Schema 验证、Prompt Injection 数据边界和脱敏 Supabase 错误诊断。
 - 只有模型成功并通过 Schema 验证才确认成功；失败不得计入成功分析次数。
+- 平台 Worker 的稳定性配置必须保持 `thinking: { type: 'disabled' }`，不得发送 `reasoning_effort: 'high'`；模型、`max_tokens: 8192`、`response_format: json_object` 与 Dashboard 的 `MODEL_TIMEOUT_MS` 保持独立配置。Worker Prompt 必须完整要求 Schema 1.2 的 13 个业务字段，但优先每个数组生成最小数量的简洁内容。
 - 根目录 `cloudflare-worker.js` 是旧入口，继续保持禁用。
 
 ## 文档与测试要求
