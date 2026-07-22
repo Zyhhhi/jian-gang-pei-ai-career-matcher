@@ -216,7 +216,17 @@ class MockBackend {
     if (this.providerMode === 'timeout') return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
     if (this.providerMode === '429') return Response.json({ error: { message: 'limited' } }, { status: 429 });
     if (this.providerMode === 'non-json') return Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'not json' } }] });
-    if (this.providerMode === 'length') return Response.json({ choices: [{ finish_reason: 'length', message: { content: '{' } }] });
+    if (this.providerMode === 'length') {
+      return Response.json({
+        choices: [{ finish_reason: 'length', message: { content: '{' } }],
+        usage: {
+          total_tokens: 8192,
+          completion_tokens: 6144,
+          completion_tokens_details: { reasoning_tokens: 2048, private_detail: 'PRIVATE_MODEL_BODY_SENTINEL' },
+          private_root: 'PRIVATE_USAGE_SENTINEL'
+        }
+      });
+    }
     const report = validContent();
     if (this.providerMode === 'missing-field') delete report.scores.overall;
     return Response.json({ model: input.model, choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(report) } }] });
@@ -252,13 +262,31 @@ test('Worker uses only V2 quota RPCs and no legacy quota or pre-query authority'
 
 test('DeepSeek request and sanitized Supabase diagnostics retain their security contract', () => {
   const requestBody = worker.buildDeepSeekRequest({ model: MODEL, requestId: 'request-12345678', resumeProfile: validPayload().resumeProfile, jobDraft: validPayload().jobDraft });
-  assert.deepEqual(requestBody.thinking, { type: 'enabled' });
+  assert.deepEqual(requestBody.thinking, { type: 'disabled' });
+  assert.equal('reasoning_effort' in requestBody, false);
+  assert.equal(requestBody.max_tokens, 8192);
   assert.equal(requestBody.response_format.type, 'json_object');
   assert.equal('temperature' in requestBody, false);
   const headers = worker.buildSupabaseAdminHeaders({ SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_test-only-placeholder' });
   assert.equal(headers.Authorization, undefined);
   const diagnostic = worker.buildSupabaseFailureDiagnostic('/rest/v1/rpc/reserve_platform_ai_quota_v2?private=x', 400, JSON.stringify({ message: 'private@example.com sb_secret_hidden sk-hidden' }));
   assert.doesNotMatch(JSON.stringify(diagnostic), /private@example\.com|sb_secret_hidden|sk-hidden/);
+});
+
+test('provider usage diagnostics only preserve allowlisted numeric fields', () => {
+  assert.deepEqual(worker.sanitizeProviderUsage({
+    total_tokens: 8192,
+    completion_tokens: 6144,
+    completion_tokens_details: { reasoning_tokens: 2048, secret: 'PRIVATE_USAGE_SENTINEL' },
+    private_root: 'PRIVATE_USAGE_SENTINEL'
+  }), { totalTokens: 8192, completionTokens: 6144, reasoningTokens: 2048 });
+  assert.equal(worker.sanitizeProviderUsage({ total_tokens: -1, private_root: 'PRIVATE_USAGE_SENTINEL' }), null);
+  const diagnostics = worker.buildSafeModelDiagnostics({
+    finishReason: 'length',
+    usage: { total_tokens: 8192, completion_tokens: 6144, reasoning_tokens: 2048, private: 'PRIVATE_USAGE_SENTINEL' }
+  }, 1234.9);
+  assert.deepEqual(diagnostics, { finishReason: 'length', totalTokens: 8192, completionTokens: 6144, reasoningTokens: 2048, durationMs: 1234 });
+  assert.doesNotMatch(JSON.stringify(diagnostics), /PRIVATE_USAGE_SENTINEL/);
 });
 
 test('Schema 1.2 validates business content, injects control fields and shares output limits', () => {
@@ -277,6 +305,7 @@ test('Schema 1.2 validates business content, injects control fields and shares o
   const prompt = worker.buildPrompt(validPayload().resumeProfile, validPayload().jobDraft);
   assert.match(prompt, /Do not rename, nest, alias, omit, or add fields/);
   assert.doesNotMatch(prompt, /Set requestId|Set model|"schemaVersion"|"requestId"|"model"|"generatedAt"/);
+  assert.deepEqual(Object.keys(worker.PROMPT_OUTPUT_SHAPE), Object.keys(worker.schemaExample()));
 
   const invalidReports = [
     value => { delete value.resumeRewrite; },
@@ -522,6 +551,14 @@ for (const [mode, expected] of [
     assert.equal(backend.existingPeriod(USER_ID, 'day', record.dayStart).reserved, 0);
     assert.equal(backend.existingPeriod(USER_ID, 'month', record.monthStart).reserved, 0);
     assert.equal([...backend.requests.values()].filter(item => item.createdAt >= backend.nowMs - 60000).length, 1);
+    if (mode === 'length') {
+      assert.equal(result.diagnostics.finishReason, 'length');
+      assert.equal(result.diagnostics.totalTokens, 8192);
+      assert.equal(result.diagnostics.completionTokens, 6144);
+      assert.equal(result.diagnostics.reasoningTokens, 2048);
+      assert.equal(typeof result.diagnostics.durationMs, 'number');
+      assert.doesNotMatch(JSON.stringify(result.diagnostics), /PRIVATE_MODEL_BODY_SENTINEL|PRIVATE_USAGE_SENTINEL/);
+    }
   });
 }
 
