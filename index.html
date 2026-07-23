@@ -777,7 +777,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
       </div>
       <ul class="capability-list">
         <li><strong>能力边界：</strong>支持 TXT、文字型 PDF、DOCX 本地解析；暂不支持扫描版 PDF、图片简历或 OCR。</li>
-          <li><strong>真实状态：</strong>本地演示模式与登录后的自带 DeepSeek Key 直连已开放；平台 AI 仍未开放。</li>
+              <li><strong>真实状态：</strong>登录后可使用平台 AI 或自带 DeepSeek Key；本地演示模式不调用真实大模型。</li>
       </ul>
     </aside>
   </section>
@@ -797,14 +797,14 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
           <div class="privacy-note"><strong>随时清空</strong>用户可以随时在“本地数据管理”中清空本地数据。</div>
           <div class="privacy-note"><strong>敏感信息</strong>请勿上传身份证号、银行卡号、家庭住址、无关聊天记录等敏感信息。</div>
         </div>
-        <div class="profile-safe">后续如果使用平台 AI，会在发送给 AI 服务前提示用户确认。</div>
+              <div class="profile-safe">使用平台 AI 前会提示确认：简历与已确认 JD 将发送至平台模型处理。</div>
       </section>
 
       <section class="panel profile-panel">
         <div class="panel-head">
           <div>
             <h2>隐私与数据安全说明</h2>
-            <p class="hint">简历内容仅用于本次岗位匹配分析。简历档案、岗位草稿和求职记录按当前登录账号或访客空间保存在浏览器本地，不会自动上传服务器。自带 API Key 仅在当前登录期间保存，退出或切换账号会清除。后续平台 AI 模式下，简历和岗位 JD 会发送至 AI 服务用于生成分析结果，届时会明确提示用户确认。</p>
+              <p class="hint">简历档案、岗位草稿和求职记录按当前登录账号或访客空间保存在浏览器本地。使用平台 AI 时，已确认的简历和 JD 会发送至平台模型生成结果；请勿上传身份证、银行卡、API Key 等敏感信息。</p>
           </div>
         </div>
         <div class="privacy-grid">
@@ -925,7 +925,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
             </button>
             <button class="ai-mode-card" id="modeCardPlatformApi" type="button" onclick="selectAiMode('platform_api')">
               <strong>平台 AI 模式</strong>
-              <span>登录后可选择；每日最多 5 次、每月最多 30 次，当前仍在测试。</span>
+                  <span>登录后可使用；每日最多成功分析 5 次、每月最多成功分析 30 次。</span>
             </button>
           </div>
           <div class="mode-detail" id="modeDetailMock">
@@ -951,13 +951,13 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
           </div>
           <div class="mode-detail" id="modeDetailPlatformApi">
             <strong>当前模式：平台 AI 模式</strong>
-            <p class="hint">仅登录后可用。平台 AI 目标规则为成功分析才计次，每日最多 5 次、每月最多 30 次；当前仍在测试，页面不会调用平台模型。</p>
+              <p class="hint">仅登录后可用。仅成功分析扣除额度：每日最多 5 次、每月最多 30 次。已确认的简历和 JD 将发送至平台模型处理，请勿上传敏感信息。</p>
             <ul class="mode-rules">
               <li>每日最多 5 次。</li>
               <li>每月最多 30 次。</li>
               <li>仅成功分析计次；失败不计次。</li>
             </ul>
-            <div class="status error" id="platformAiAccessStatus">登录后可查看平台 AI 使用规则。当前仍在测试，不会调用平台模型。</div>
+              <div class="status" id="platformAiAccessStatus">登录后可使用平台 AI。仅成功分析扣除额度。</div>
             <div class="ops">
               <button class="secondary-btn" type="button" onclick="goToLoginPanel()">去登录</button>
             </div>
@@ -967,7 +967,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 
         <section class="job-method" id="accountPanel">
           <h3>账号登录与使用规则</h3>
-          <p class="hint">未登录可继续使用本地演示。登录后可选择平台 AI 或自带 API Key；平台 AI 当前仍在测试，真实调用尚未开放。</p>
+            <p class="hint">未登录可继续使用本地演示。登录后可选择平台 AI 或自带 API Key；平台 AI 会将已确认的简历和 JD 发送至平台模型处理。</p>
           <div class="auth-box">
             <div class="field">
               <label for="loginEmailInput">邮箱登录 / 注册</label>
@@ -1279,16 +1279,16 @@ const SUPABASE_AUTH_CONFIG = {
 };
 
 const RELEASE_CONFIG = Object.freeze({
-  VERSION: 'v0.8.6c-j',
-  MODE_SUMMARY: '未登录仅可使用本地演示；登录后可使用自带 DeepSeek Key 直连，平台 AI 仍在测试',
-  UPDATED_AT: '2026-07-20'
+  VERSION: 'v0.8.6d',
+  MODE_SUMMARY: '未登录仅可使用本地演示；登录后可使用平台 AI 或自带 DeepSeek Key',
+  UPDATED_AT: '2026-07-23'
 });
 
 const PLATFORM_AI_CONFIG = {
   // Production Worker endpoint is wired, but platform AI remains disabled by default.
   PLATFORM_WORKER_BASE_URL: 'https://jian-gang-pei-platform-ai.sozowali642.workers.dev',
   PLATFORM_ANALYZE_PATH: '/api/platform-analyze',
-  ENABLE_PLATFORM_AI: false
+  ENABLE_PLATFORM_AI: true
 };
 
 const TRUSTED_REPORT_SCHEMA_VERSION = '1.2';
@@ -1790,7 +1790,7 @@ function selectAiMode(mode, source = 'mode_switch') {
     renderAiModeState();
     renderLocalDataStatus();
     openLoginPanel();
-    setStatus('登录后可选择平台 AI 或自带 API Key。本模式仅用于体验产品流程，当前请使用本地演示模式。', 'error');
+    setStatus('登录后可选择平台 AI 或自带 API Key。本地演示模式仅用于体验产品流程，不调用真实大模型。', 'error');
     return;
   }
   localDataStore.writeText(STORAGE.aiMode, mode);
@@ -1844,10 +1844,10 @@ function renderAiModeState() {
         ? `当前模式：自带 DeepSeek API Key 模式。已保存 ${maskApiKey(getUserApiKey())}；勾选数据直传提示后可发起真实分析。`
         : '当前模式：自带 DeepSeek API Key 模式。请先在本地保存自己的 Key，再确认数据直传提示。',
       platform_api: !PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI
-        ? '当前模式：平台 AI 模式。每日最多 5 次、每月最多 30 次；当前仍在测试，不会调用平台模型。'
+      ? '当前模式：平台 AI 模式。仅成功分析扣除额度，每日最多 5 次、每月最多 30 次。'
         : platformWorkerConfigured()
           ? '当前模式：平台 AI 模式。成功分析才计次，同时受每日 5 次和每月 30 次约束。'
-          : '当前模式：平台 AI 模式。后端 Worker 尚未配置，当前不会调用平台模型。'
+          : '当前模式：平台 AI 模式。后端 Worker 尚未配置，暂时不可用。'
     };
     aiModeStatus.textContent = statusText[mode];
     const unavailable = (mode === 'own_api' && !getUserApiKey()) ||
@@ -2212,7 +2212,7 @@ async function verifyEmailOtp() {
     if (!data?.session) throw new Error('session_missing');
     syncAuthSession(data.session);
     resetOtpLoginState({ clearEmail: true });
-      setAuthMessage('登录成功。自带 DeepSeek API Key 可直接使用；平台 AI 当前仍在测试。', 'success');
+  setAuthMessage('登录成功。可选择平台 AI 或自带 DeepSeek API Key。', 'success');
   } catch (err) {
     trackEvent('login_failed', { metadata: authEventMetadata('otp_verify') });
     setAuthMessage(authErrorMessage(err, '验证码验证失败，请重新发送后再试。'), 'error');
@@ -2259,7 +2259,7 @@ function renderAuthState() {
   const email = currentAuthSession?.user?.email || '';
   const loginMethod = isMagicLinkLoginMode() ? 'Magic Link' : '邮箱验证码';
   authStatus.textContent = email
-    ? `已登录：${maskEmail(email)}。可选择平台 AI 或自带 API Key；平台 AI 当前仍在测试。`
+    ? `已登录：${maskEmail(email)}。可选择平台 AI 或自带 API Key。`
     : `未登录。仅可使用本地演示模式；当前使用 ${loginMethod} 登录。`;
   authStatus.className = `status ${email ? 'success' : ''}`.trim();
 }
@@ -2297,7 +2297,7 @@ function renderPlatformAiAccessState() {
     return;
   }
   if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
-    platformAiAccessStatus.textContent = '已登录。平台 AI 目标规则为每日最多 5 次、每月最多 30 次；当前仍在测试，不会调用平台模型。';
+    platformAiAccessStatus.textContent = '已登录。平台 AI 仅成功分析扣除额度：每日最多 5 次、每月最多 30 次。';
     platformAiAccessStatus.className = 'status error';
     return;
   }
@@ -3355,7 +3355,7 @@ function validateAiModeForAnalysis() {
       return '平台 AI 模式需要登录后使用。';
     }
     if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
-      return '平台 AI 目标规则为每日最多 5 次、每月最多 30 次；当前仍在测试，不会调用平台模型。请切换到本地演示模式。';
+    return '平台 AI 当前不可用，请稍后重试或选择本地演示模式。';
     }
     const resumeLength = getResumeProfile()?.resumeText?.length || 0;
     if (resumeLength > RESUME_IMPORT_CONFIG.PLATFORM_RESUME_CHAR_LIMIT) {
@@ -4054,7 +4054,7 @@ function buildPlatformAnalyzePayload(requestId, profile, draft) {
 }
 async function runPlatformAnalyze(profile, draft, startedAt) {
   if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI) {
-    throw new Error('平台 AI 正在进行安全与额度闭环测试，当前暂未开放。');
+    throw new Error('平台 AI 当前不可用，请稍后重试。');
   }
   const endpoint = getPlatformWorkerEndpoint();
   const token = currentAuthSession?.access_token;

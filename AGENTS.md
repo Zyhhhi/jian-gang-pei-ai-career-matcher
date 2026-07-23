@@ -15,9 +15,9 @@
 
 ## 当前真实实现边界
 
-- `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 必须保持 `false`，不得公开打开。
+- `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 当前为 `true`，平台 AI 已公开开放；Worker `PLATFORM_AI_ENABLED` 是独立的服务端紧急熔断开关，公开运行时应为严格字符串 `true`。
 - 正式 Worker `jian-gang-pei-platform-ai` 已部署，入口为 `worker/index.js`，接口为 `https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`。根目录 `cloudflare-worker.js` 仅为历史禁用入口。v0.8.6c-k 的 Worker-only 稳定性修复尚未部署。
-- 前端已接线正式 Worker 地址，但 `ENABLE_PLATFORM_AI` 继续为 `false`。Worker 的 `PLATFORM_AI_ENABLED` 是独立的服务端紧急熔断开关，当前也为 `false`；缺失或除严格字符串 `true` 外的任何值均视为关闭。关闭时平台分析 POST 必须在 Supabase Auth、V2 RPC 和 DeepSeek 之前返回 `503 PLATFORM_AI_DISABLED`，但 OPTIONS/CORS 预检必须继续可用。
+- 前端已接线正式 Worker 地址，`ENABLE_PLATFORM_AI=true`。Worker 的 `PLATFORM_AI_ENABLED` 是独立的服务端紧急熔断开关；缺失或除严格字符串 `true` 外的任何值均视为关闭。关闭时平台分析 POST 必须在 Supabase Auth、V2 RPC 和 DeepSeek 之前返回 `503 PLATFORM_AI_DISABLED`，但 OPTIONS/CORS 预检必须继续可用。
 - 正式 Worker 已配置 `DEEPSEEK_API_KEY` 与 `SUPABASE_SERVICE_ROLE_KEY` 两个 Secret；只能记录名称，绝不能输出、复制或写入其值。实际部署前必须确认被 `.gitignore` 忽略的 `worker/wrangler.toml` 不会覆盖 Dashboard 中已验证的 CORS Origin 配置。
 - `SUPABASE_AUTH_CONFIG.LOGIN_MODE` 是登录模式唯一事实来源，当前必须为 `magic_link`。正式发布使用 `signInWithOtp({ email, options: { emailRedirectTo } })`；redirect 由当前 HTTP(S) 页面路径生成，不得硬编码本地地址。
 - `email_otp` 的发送、验证、倒计时与 Mock 测试必须继续保留，但默认隐藏且不得由普通用户触发。只有完成 SMTP 模板与真实验收后，才可将 `LOGIN_MODE` 改为 `email_otp`。
@@ -28,9 +28,9 @@
 - Schema 1.2 的所有受限数组必须统一先全量校验项目，再对纯字符串数组执行去空、trim 和稳定去重，最后保留前 `max` 项；安全截取只记录 `ARRAY_ITEMS_TRUNCATED` 与允许列表路径，不记录内容或数量。归一化后低于 `min`、项目非法、字段缺失、错误嵌套或字符串超长仍必须失败。
 - 自带 Key 调用前必须同时满足：已登录、已保存有效 Key、已确认简历与 JD 将直接发送给 DeepSeek；失败不得回退 Mock，只有通过本地 JSON 结构校验后才可渲染并写入本地历史。
 - 已由本地浏览器探针确认 DeepSeek 直连 CORS 可用；GitHub Pages 正式域名仍须在发布前做一次独立 CORS 验收。若正式域名 CORS 失败，停止该功能发布，不得引入代理。
-- 当前平台 AI 尚未公开开放；前端关闭门禁必须阻止 Worker 请求，服务端熔断必须阻止 Supabase Auth、V2 RPC 和 DeepSeek 调用。
+- 平台 AI 已公开开放。前端可调用 Worker；服务端熔断关闭时仍必须阻止 Supabase Auth、V2 RPC 和 DeepSeek 调用。
 - V2 migration 已在真实 Supabase 执行一次；V2 RPC、RLS、函数 owner、`SECURITY DEFINER`、`search_path` 和最小权限均已人工验收，不得重复执行 migration。
-- 已完成一次受控真实后端调用，Worker、DeepSeek 与 V2 日/月计数链路均成功；验收后已立即恢复 `PLATFORM_AI_ENABLED=false`。后续两次 v0.8.6c-j 受控请求分别得到 `MODEL_TIMEOUT` 与上游 HTTP 200 后的 `OUTPUT_TRUNCATED`；两次均已退款，日/月 `reserved_count` 已归零且未增加成功次数。该结果只证明后端闭环与退款链路可用，不代表平台 AI 已公开开放。
+- 已完成受控真实端到端调用，Worker、DeepSeek 与 V2 日/月计数链路均成功；前端公开开关已启用。Cron 每 2 分钟恢复陈旧 `reserved` / `processing` 请求，断线后不保证结果可取回，但额度会自动释放。
 
 ## 数据安全边界
 
@@ -63,8 +63,8 @@
 - 产品规则变化时同步更新 `README.md`、本文件和对应 release 文档；不得修改用户维护的 `PRODUCT.md`，除非用户明确要求。
 - 当前根目录没有 `package.json`，不要强行运行 `npm run build`。
 - Worker 改动至少运行 `node --test worker/tests/stage-8.6b-worker.test.mjs`。
-- 平台 AI 前端地址或开关改动至少运行 `node --test tests/platform-ai-config.contract.test.mjs`，检查正式基地址、接口路径、完整端点、旧测试地址移除和关闭状态零 Worker 请求。
-- 页面规则改动至少检查：未登录只能 Mock、非 Mock 不发 Worker、`ENABLE_PLATFORM_AI` 为 false、收费文案和付费埋点已移除、导入函数仍在。
+- 平台 AI 前端地址或开关改动至少运行 `node --test tests/platform-ai-config.contract.test.mjs`，检查正式基地址、接口路径、完整端点、旧测试地址移除、生产开关与紧急关闭状态零 Worker 请求。
+- 页面规则改动至少检查：未登录只能 Mock、非 Mock 不发 Worker、生产 `ENABLE_PLATFORM_AI` 配置正确、收费文案和付费埋点已移除、导入函数仍在。
 - 登录模式改动至少运行 `node --test tests/login-mode.contract.test.mjs` 与 `node --test tests/otp-auth.contract.test.mjs`，检查默认 Magic Link redirect、OTP 休眠保留、session 恢复和退出后的门禁。
 - 自带 DeepSeek Key 改动至少运行 `node --test tests/own-api-direct.contract.test.mjs`，检查固定端点、无 Key 请求体泄露、结构校验、错误不回退 Mock 与未登录门禁。
 - 本地敏感数据或认证切换改动至少运行 `node --test tests/local-data-isolation.contract.test.mjs`，检查 auth 恢复默认拒绝、guest/A/B 隔离、定向 Key 清除、legacy quarantine、损坏 JSON 降级与切换顺序。

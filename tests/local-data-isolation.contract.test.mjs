@@ -148,7 +148,7 @@ test('业务代码的敏感存储读写只存在于唯一访问层，认证切�
   assert.ok(syncSource.indexOf('clearSensitivePageState()') < syncSource.indexOf('clearActiveUserApiKey()'));
   assert.ok(syncSource.indexOf('clearActiveUserApiKey()') < syncSource.indexOf('activateFromVerifiedSession'));
   assert.ok(syncSource.indexOf('activateFromVerifiedSession') < syncSource.indexOf('loadActiveScopeData()'));
-  assert.match(html, /ENABLE_PLATFORM_AI:\s*false/);
+  assert.match(html, /ENABLE_PLATFORM_AI:\s*true/);
   assert.match(html, /user_id', 'userId', 'uid'/);
   assert.match(html, /'report', 'fullReport', 'result', 'resumeProfile', 'jobDraft', 'history', 'feedback'/);
 });
