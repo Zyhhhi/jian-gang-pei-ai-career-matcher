@@ -16,6 +16,12 @@ test('v0.9.0 exposes the four-step analysis shell and independent navigation', (
   assert.doesNotMatch(source, /保存简历、确认岗位、选择分析方式，再在同一工作区复用完整结果。/);
 });
 
+test('stepper stages explicitly honor hidden state so the highlighted step matches the visible panel', () => {
+  assert.match(source, /\.step-stage\[hidden\]\s*\{\s*display:\s*none;\s*\}/);
+  assert.match(source, /stage\.hidden = index !== step/);
+  assert.match(source, /button\.setAttribute\('aria-current', index === step \? 'step' : 'false'\)/);
+});
+
 test('results use four internal tabs without changing the model protocol', () => {
   ['匹配总览', '简历优化', '面试准备', '求职材料'].forEach(label => assert.match(source, new RegExp(label)));
   assert.match(source, /function selectResultTab\(/);

@@ -738,6 +738,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 .app-view { display: none; min-height: min(650px, calc(100vh - 244px)); }
 .app-view.active { display: block; }
 .step-stage { height: 100%; display: grid; align-content: start; gap: 16px; }
+.step-stage[hidden] { display: none; }
 .stage-intro { display:flex; justify-content:space-between; gap:20px; align-items:flex-end; }
 .stage-intro h2 { margin: 0; font-size: 24px; }
 .stage-intro p { margin: 5px 0 0; color: var(--muted); }
