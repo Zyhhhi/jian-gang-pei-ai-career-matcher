@@ -16,7 +16,7 @@
 ## 当前真实实现边界
 
 - `PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI` 当前为 `true`，平台 AI 已公开开放；Worker `PLATFORM_AI_ENABLED` 是独立的服务端紧急熔断开关，公开运行时应为严格字符串 `true`。
-- 正式 Worker `jian-gang-pei-platform-ai` 已部署，入口为 `worker/index.js`，接口为 `https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`。根目录 `cloudflare-worker.js` 仅为历史禁用入口。v0.8.6c-k 的 Worker-only 稳定性修复尚未部署。
+- 正式 Worker `jian-gang-pei-platform-ai` 已部署，入口为 `worker/index.js`，接口为 `https://jian-gang-pei-platform-ai.sozowali642.workers.dev/api/platform-analyze`。根目录 `cloudflare-worker.js` 仅为历史禁用入口。Schema 1.2、有界数组归一化、输出效率优化与 stale recovery 已部署。
 - 前端已接线正式 Worker 地址，`ENABLE_PLATFORM_AI=true`。Worker 的 `PLATFORM_AI_ENABLED` 是独立的服务端紧急熔断开关；缺失或除严格字符串 `true` 外的任何值均视为关闭。关闭时平台分析 POST 必须在 Supabase Auth、V2 RPC 和 DeepSeek 之前返回 `503 PLATFORM_AI_DISABLED`，但 OPTIONS/CORS 预检必须继续可用。
 - 正式 Worker 已配置 `DEEPSEEK_API_KEY` 与 `SUPABASE_SERVICE_ROLE_KEY` 两个 Secret；只能记录名称，绝不能输出、复制或写入其值。实际部署前必须确认被 `.gitignore` 忽略的 `worker/wrangler.toml` 不会覆盖 Dashboard 中已验证的 CORS Origin 配置。
 - `SUPABASE_AUTH_CONFIG.LOGIN_MODE` 是登录模式唯一事实来源，当前必须为 `magic_link`。正式发布使用 `signInWithOtp({ email, options: { emailRedirectTo } })`；redirect 由当前 HTTP(S) 页面路径生成，不得硬编码本地地址。
@@ -51,7 +51,7 @@
 - 平台 AI 必须通过 `worker/index.js`，前端不得直连 DeepSeek。
 - Worker 以后端验证的 Supabase 用户 ID 为准，不信任前端 userId。
 - 平台 AI V2 额度由 `docs/migrations/20260716_stage_8_6c_v2_platform_daily_monthly_quota.sql` 的 service-role RPC 唯一裁决：`reserve_platform_ai_quota_v2` 必须在同一用户事务锁内完成 Asia/Shanghai 日 5、月 30、滚动 60 秒 2 次、requestId 去重和陈旧恢复。Worker 不得以 RPC 外的预查询作为额度或限流权威，也不得读取、扣减或返回 legacy free/paid credits。
-- V2 的 `reserved` / `processing` 请求可在同一用户下一次 reserve 时自动恢复；v0.8.6c-l 另加入未部署的 Scheduled Cron 恢复路径，按 5 分钟 TTL 独立扫描并逐条调用 `recover_stale_platform_ai_request_v2`。TTL 必须大于 Dashboard `MODEL_TIMEOUT_MS` 加安全余量，否则 Scheduled 恢复必须拒绝运行。失败、超时或非法输出只释放请求创建时记录的日/月预留，仍计入 60 秒防刷窗口；finalize、refund、recover 必须幂等且不得使 reserved_count 为负。
+- V2 的 `reserved` / `processing` 请求可在同一用户下一次 reserve 时自动恢复；Scheduled Cron 已按每 2 分钟运行，按 5 分钟 TTL 独立扫描并逐条调用 `recover_stale_platform_ai_request_v2`。TTL 必须大于 Dashboard `MODEL_TIMEOUT_MS` 加安全余量，否则 Scheduled 恢复必须拒绝运行。失败、超时或非法输出只释放请求创建时记录的日/月预留，仍计入 60 秒防刷窗口；finalize、refund、recover 必须幂等且不得使 reserved_count 为负。
 - 保留旧原子预留、处理、成功确认、失败恢复、stale 恢复与 requestId 幂等 RPC，供历史数据兼容；新 Worker 只能使用 V2 RPC。
 - 保留输入长度限制、限流、严格 Schema 验证、Prompt Injection 数据边界和脱敏 Supabase 错误诊断。
 - 只有模型成功并通过 Schema 验证才确认成功；失败不得计入成功分析次数。
