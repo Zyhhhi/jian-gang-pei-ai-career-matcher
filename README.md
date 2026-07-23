@@ -4,12 +4,12 @@
 
 ## 当前产品状态
 
-- 当前阶段：登录策略、自带 Key、平台 AI V2 额度和正式 Worker 后端闭环均已完成对应验证；平台 AI 尚未公开开放。
-- 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = false`。
-- 当前真实可用分析：本地规则 / Mock 分析，以及登录后的自带 DeepSeek Key 浏览器直连分析。
+- 当前阶段：登录策略、自带 Key、平台 AI V2 额度、正式 Worker 与 stale recovery Cron 均已完成验收；平台 AI 已正式开放。
+- 当前前端开关：`PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI = true`。
+- 当前真实可用分析：本地规则 / Mock 分析、登录后的平台 AI，以及登录后的自带 DeepSeek Key 浏览器直连分析。
 - 当前发布登录：Supabase 邮箱 Magic Link。OTP 发送与验证代码已保留，但默认不对用户开放，等待 SMTP 配置和真实验收。
-- 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；新的模型输出使用 Schema 1.2 有界业务内容契约，`schemaVersion`、`requestId`、`model` 和 UTC `generatedAt` 均由应用注入，平台 AI 仍未开放。
-- 当前平台 AI：前端已接线正式 Worker，但前端 `ENABLE_PLATFORM_AI=false`、Worker `PLATFORM_AI_ENABLED=false`，公开页面不会调用平台 Worker、DeepSeek 或真实额度 RPC。
+- 当前自带 API Key：已支持登录后使用自己的 DeepSeek Key 由浏览器直连真实分析；新的模型输出使用 Schema 1.2 有界业务内容契约，`schemaVersion`、`requestId`、`model` 和 UTC `generatedAt` 均由应用注入。
+- 当前平台 AI：前端已接线正式 Worker，公开页面登录后可调用平台 AI；服务端 `PLATFORM_AI_ENABLED` 是可独立关闭的紧急熔断开关。
 
 本地演示模式仅用于体验产品流程，结果由本地规则生成，不调用真实大模型。
 
@@ -21,7 +21,7 @@
 
 ### 已登录用户
 
-- 平台 AI：V2 后端规则为成功分析才计次，按 Asia/Shanghai 自然日最多 5 次、自然月最多 30 次；每用户滚动 60 秒最多接受 2 次请求。V2 migration 已在真实 Supabase 执行一次并完成函数、RLS 与最小权限验收；正式 Worker 已部署并完成一次受控真实后端调用。验收后服务端开关已恢复 `false`，前端开关也保持 `false`，因此这不是已开放的线上能力。
+- 平台 AI：登录后可用。V2 后端规则为成功分析才计次，按 Asia/Shanghai 自然日最多 5 次、自然月最多 30 次；每用户滚动 60 秒最多接受 2 次请求。已确认的简历和 JD 会发送至平台模型处理，请勿上传身份证、银行卡、API Key 等敏感信息。浏览器断线时结果可能无法取回，但每 2 分钟运行的 stale recovery Cron 会释放陈旧额度预留。
 - 自带 DeepSeek API Key：登录后可用，不占平台次数，费用由用户自己的 DeepSeek 账户承担。Key 默认仅保存在当前浏览器；开始分析前页面会明确提示已确认的简历和 JD 将直接发送给 DeepSeek，且不会经过 Worker、Supabase 或代理。
 
 收费、支付和订单方案已取消。历史数据库中的 `platform_paid_credits` 字段暂时保留以避免破坏既有数据和 migration，但已废弃：前端不展示、不读取、不依赖该字段。
@@ -55,7 +55,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 - Schema 1.2 只要求模型生成允许列表内的业务字段；未知字段递归丢弃，必要字段缺失、类型错误、空内容或超出有界输出限制时均失败且不保存历史。
 - Schema 1.2 的受限数组会在全量项目校验后统一安全归一化：字符串数组去空、trim、稳定去重，全部数组超出最大数量时保留前 `max` 项并只产生脱敏 warning；非法项目、字符串超长或归一化后低于最小数量仍失败。
 - 本地浏览器 CORS 探针已由人工验证通过；GitHub Pages 正式域名发布前仍必须用用户本人临时 Key 完成一次 OPTIONS/POST 二次验收。若 CORS 失败，停止自带 Key 发布，不引入代理，也不回退 Mock。
-- 平台 AI 未开放前，前端不会把简历或 JD 发送到 Worker。
+- 平台 AI 仅在登录、简历保存和 JD 确认后发送已确认的简历与 JD 至 Worker；请勿在这些内容中提供身份证、银行卡、API Key 等敏感信息。
 
 ## 平台 AI 安全基线
 
@@ -76,7 +76,7 @@ Supabase **Authentication → URL Configuration** 在 Magic Link 发布前需要
 ## 文件说明
 
 - `index.html`：静态前端、模式权限门禁、双模式登录开关与本地 Mock 分析。
-- `worker/index.js`：平台 AI Worker 安全实现；当前前端开关关闭。
+- `worker/index.js`：平台 AI Worker 安全实现，含 stale recovery Scheduled handler。
 - `docs/product-plan-free-v1.md`：免费产品正式方案与未完成项。
 - `docs/release-0.8.6c-a.md`：8.6C-A 页面和规则重置记录。
 - `docs/release-0.8.6c-b.md`：8.6C-B OTP 前端实现与验证边界。

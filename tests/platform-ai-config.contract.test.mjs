@@ -41,27 +41,27 @@ function createHarness(config = platformConfig) {
   return { ...api, fetchCalls };
 }
 
-test('平台 AI 前端固定接线正式 Worker，且默认保持关闭', () => {
+test('平台 AI 前端固定接线正式 Worker，且生产默认开放', () => {
   assert.equal(platformConfig.PLATFORM_WORKER_BASE_URL, productionWorkerBaseUrl);
   assert.equal(platformConfig.PLATFORM_ANALYZE_PATH, analyzePath);
-  assert.equal(platformConfig.ENABLE_PLATFORM_AI, false);
+  assert.equal(platformConfig.ENABLE_PLATFORM_AI, true);
   assert.doesNotMatch(html, new RegExp(retiredTestWorkerBaseUrl.replaceAll('.', '\\.')));
 
   const harness = createHarness();
   assert.equal(harness.getPlatformWorkerEndpoint(), productionEndpoint);
 });
 
-test('平台 AI 关闭门禁位于 fetch 之前，关闭状态不会请求 Worker', async () => {
+test('平台 AI 紧急关闭门禁位于 fetch 之前，关闭状态不会请求 Worker', async () => {
   const guardIndex = analyzeSource.indexOf('if (!PLATFORM_AI_CONFIG.ENABLE_PLATFORM_AI)');
   const fetchIndex = analyzeSource.indexOf('fetch(endpoint');
   assert.ok(guardIndex >= 0, '缺少平台 AI 关闭门禁');
   assert.ok(fetchIndex >= 0, '缺少平台 Worker fetch');
   assert.ok(guardIndex < fetchIndex, '平台 AI 关闭门禁必须先于 fetch');
 
-  const harness = createHarness();
+  const harness = createHarness({ ...platformConfig, ENABLE_PLATFORM_AI: false });
   await assert.rejects(
     harness.runPlatformAnalyze({}, {}, 0),
-    /当前暂未开放/
+    /当前不可用/
   );
   assert.equal(harness.fetchCalls.length, 0);
 });

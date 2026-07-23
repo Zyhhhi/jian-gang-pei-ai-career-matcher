@@ -172,8 +172,8 @@ test('session 恢复与退出会更新页面登录门禁状态', async () => {
   assert.match(harness.nodes.authStatus.textContent, /已退出登录/);
 });
 
-test('OTP 模式静态规则保持可用、免费门禁和平台 AI 关闭', () => {
-  assert.match(html, /ENABLE_PLATFORM_AI:\s*false/);
+test('OTP 模式静态规则保持可用、免费门禁和平台 AI 公开配置', () => {
+  assert.match(html, /ENABLE_PLATFORM_AI:\s*true/);
   assert.match(html, /mode !== 'mock' && !currentAuthSession/);
   assert.match(html, /LOGIN_MODE:\s*'magic_link'/);
   assert.match(html, /autocomplete="one-time-code"/);
