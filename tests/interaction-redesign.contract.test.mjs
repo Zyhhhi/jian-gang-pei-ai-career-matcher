@@ -11,6 +11,9 @@ test('v0.9.0 exposes the four-step analysis shell and independent navigation', (
   assert.match(source, /产品说明/);
   assert.match(source, /注意事项/);
   assert.match(source, /今日剩余额度：5 次/);
+  assert.match(source, /岗位匹配工具 · RoleFit AI/);
+  assert.doesNotMatch(source, /用四步，完成一次更有依据的投递判断。/);
+  assert.doesNotMatch(source, /保存简历、确认岗位、选择分析方式，再在同一工作区复用完整结果。/);
 });
 
 test('results use four internal tabs without changing the model protocol', () => {

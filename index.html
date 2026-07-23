@@ -727,9 +727,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 .footer { margin-top: 42px; color: var(--muted); font-size: 13px; text-align: center; }
 /* v0.9.0 interaction shell: presentation only; business IDs and handlers remain unchanged. */
 .redesign-shell { display: grid; gap: 18px; min-height: calc(100vh - 118px); }
-.workflow-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 22px 2px 4px; }
-.workflow-head h1 { margin: 0; font-size: clamp(28px, 3vw, 42px); letter-spacing: -.04em; line-height: 1.08; }
-.workflow-head p { margin: 9px 0 0; color: var(--muted); max-width: 640px; }
+.workflow-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 2px 0; }
 .quota-top { padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--green-soft); color: var(--green); white-space: nowrap; font-size: 13px; font-weight: 720; }
 .workflow-stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 7px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,255,255,.72); }
 .workflow-step { display: flex; align-items: center; gap: 10px; padding: 11px 13px; min-height: 52px; border: 0; border-radius: 14px; background: transparent; color: var(--muted); text-align: left; font-weight: 720; }
@@ -815,7 +813,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 <body>
 <main class="shell">
   <nav class="topbar">
-    <div class="brand"><span class="mark">简</span><span>简岗配 · RoleFit AI</span></div>
+    <div class="brand"><span class="mark">简</span><span>岗位匹配工具 · RoleFit AI</span></div>
     <div class="top-links">
       <button class="ghost-link" type="button" onclick="openAppView('analysis', 1)">开始分析</button>
       <button class="ghost-link" type="button" onclick="openAppView('history')">历史记录</button>
@@ -865,7 +863,7 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 
   <section class="redesign-shell" id="appShell" aria-label="RoleFit AI 主工作区">
     <header class="workflow-head">
-      <div><span class="eyebrow">求职分析工作台</span><h1>用四步，完成一次更有依据的投递判断。</h1><p>保存简历、确认岗位、选择分析方式，再在同一工作区复用完整结果。</p></div>
+      <span class="eyebrow">求职分析工作台</span>
       <button class="secondary-btn" type="button" data-example-button onclick="fillExample()" disabled>填入虚构示例</button>
     </header>
     <div class="workflow-stepper" role="tablist" aria-label="分析步骤">
