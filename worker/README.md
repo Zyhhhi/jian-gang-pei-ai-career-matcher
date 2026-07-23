@@ -13,7 +13,8 @@
 - 已配置 Secret 名称：`DEEPSEEK_API_KEY`、`SUPABASE_SERVICE_ROLE_KEY`；不得记录或输出值
 - V2 migration 已在真实 Supabase 执行一次并完成函数、RLS 与最小权限验收，不得重复执行
 - 已完成一次受控真实后端调用；Worker、DeepSeek 与 V2 日/月计数链路成功，随后服务端开关已恢复为 `false`
-- v0.8.6c-k 的 Worker-only 稳定性修复尚未部署。此前受控请求曾分别出现 `MODEL_TIMEOUT` 与上游 HTTP 200 后的 `OUTPUT_TRUNCATED`；两次均通过 V2 RPC 退款，未增加成功次数。
+- v0.8.6c-k 的 Worker-only 输出稳定性修复已部署；服务端开关继续保持 `false`。此前受控请求曾分别出现 `MODEL_TIMEOUT` 与上游 HTTP 200 后的 `OUTPUT_TRUNCATED`；两次均通过 V2 RPC 退款，未增加成功次数。
+- v0.8.6c-l 增加了尚未部署的 Scheduled stale recovery 源码：Cron 只读取 requestId、userId、status 与 updatedAt，并逐条调用既有 V2 recovery RPC。它只保证断线后最终释放额度，不保留或返回断线请求的分析结果。
 
 本地 `worker/wrangler.toml` 被 `.gitignore` 忽略。任何再次部署前都必须先确认该文件不会覆盖 Dashboard 中已验证的 CORS Origin 配置。
 
@@ -110,6 +111,7 @@ wrangler deploy
 - IP 限流目前作为预留说明。当前 V2 RPC 使用 `ai_requests` 做用户级限流：同一用户按 Asia/Shanghai 自然日最多 5 次成功生成、自然月最多 30 次、滚动 60 秒最多 2 次请求。持久化 IP 限流建议后续使用 Durable Objects、WAF 或在 `ai_requests` 增加 `ip_hash` 字段。
 - 商业化入口已取消；`platform_paid_credits` 仅为数据库兼容字段，不得新增前端依赖。
 - 自动化测试仍只使用 Mock Supabase RPC 和 Mock Provider，不连接真实服务。V2 数据库对象与权限已人工验收，生产 Worker 也已完成一次受控真实后端调用；公开发布路径与开关启用仍待单独授权和最终线上验收。
+- 当前没有 Queue、`202 Accepted` 或请求状态轮询接口。该架构会涉及异步任务、结果保存与简历/JD 暂存策略，必须作为独立的隐私与架构升级评审，不能作为 Cron 恢复的隐式副作用。
 
 ## JSON 解析失败策略
 
@@ -118,7 +120,11 @@ Worker 会先尝试解析模型返回的 JSON；如果模型包裹了 Markdown c
 如果解析或 Schema 校验失败，Worker 返回 `INVALID_MODEL_OUTPUT`，并通过 `refund_platform_ai_quota_v2` 将请求从失败状态转换为 `refunded`。模型完整原始返回不会写入 `usage_events` 或 `ai_requests`。
 ## DeepSeek 输出参数
 
-Worker 使用 `DEEPSEEK_MODEL`，默认 `deepseek-v4-pro`。v0.8.6c-k 请求使用 `response_format: { type: "json_object" }`、`thinking: { type: "disabled" }` 与 `max_tokens: 8192`，不发送 `reasoning_effort` 或 `temperature`。请求由 `AbortController` 按 Dashboard 的 `MODEL_TIMEOUT_MS` 中止，本阶段不自动重试，避免重复模型费用。该代码尚未部署，受控验收前服务端开关必须继续为 `false`。
+Worker 使用 `DEEPSEEK_MODEL`，默认 `deepseek-v4-pro`。v0.8.6c-k 请求使用 `response_format: { type: "json_object" }`、`thinking: { type: "disabled" }` 与 `max_tokens: 8192`，不发送 `reasoning_effort` 或 `temperature`。请求由 `AbortController` 按 Dashboard 的 `MODEL_TIMEOUT_MS` 中止，本阶段不自动重试，避免重复模型费用。v0.8.6c-l 的 Cron 恢复代码尚未部署，受控验收前服务端开关必须继续为 `false`。
+
+## v0.8.6c-l stale recovery
+
+Worker 的 `scheduled()` 不受 `PLATFORM_AI_ENABLED` 影响：它不鉴权、不调用 DeepSeek、不开 HTTP 管理接口。每轮最多扫描 50 条超过 5 分钟的 V2 `reserved`/`processing` 元数据记录，并逐条调用 `recover_stale_platform_ai_request_v2`；重复或并发运行依赖 RPC 的幂等和行锁。日志只写 `scanned`、`recovered`、`skipped`、`failed` 和 `duration_ms` 汇总数字。`STALE_RECOVERY_TTL_MS` 必须严格大于 `MODEL_TIMEOUT_MS + 60000ms`，否则 Cron 拒绝恢复。示例 Cron 在 `wrangler.toml.example` 中；真实 Dashboard Trigger 尚未配置。
 
 ## v0.8.6c-k 可观测性边界
 
