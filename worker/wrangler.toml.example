@@ -11,6 +11,11 @@ PLATFORM_AI_ENABLED = "false" # Server-side emergency switch. Keep false through
 DEEPSEEK_MODEL = "deepseek-v4-pro"
 MODEL_TIMEOUT_MS = "60000"
 
+# Example only. Configure the production Cron Trigger separately in the
+# Cloudflare Dashboard; do not let a local ignored wrangler.toml overwrite it.
+[triggers]
+crons = ["*/2 * * * *"]
+
 # Secrets:
 # wrangler secret put DEEPSEEK_API_KEY
 # wrangler secret put SUPABASE_SERVICE_ROLE_KEY

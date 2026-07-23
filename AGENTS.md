@@ -51,7 +51,7 @@
 - 平台 AI 必须通过 `worker/index.js`，前端不得直连 DeepSeek。
 - Worker 以后端验证的 Supabase 用户 ID 为准，不信任前端 userId。
 - 平台 AI V2 额度由 `docs/migrations/20260716_stage_8_6c_v2_platform_daily_monthly_quota.sql` 的 service-role RPC 唯一裁决：`reserve_platform_ai_quota_v2` 必须在同一用户事务锁内完成 Asia/Shanghai 日 5、月 30、滚动 60 秒 2 次、requestId 去重和陈旧恢复。Worker 不得以 RPC 外的预查询作为额度或限流权威，也不得读取、扣减或返回 legacy free/paid credits。
-- V2 的 `reserved` / `processing` 请求在同一用户下一次 reserve 时自动恢复；TTL 固定 5 分钟，必须大于 Worker 最大 120 秒模型调用超时。失败、超时或非法输出只释放请求创建时记录的日/月预留，仍计入 60 秒防刷窗口；finalize、refund、recover 必须幂等且不得使 reserved_count 为负。
+- V2 的 `reserved` / `processing` 请求可在同一用户下一次 reserve 时自动恢复；v0.8.6c-l 另加入未部署的 Scheduled Cron 恢复路径，按 5 分钟 TTL 独立扫描并逐条调用 `recover_stale_platform_ai_request_v2`。TTL 必须大于 Dashboard `MODEL_TIMEOUT_MS` 加安全余量，否则 Scheduled 恢复必须拒绝运行。失败、超时或非法输出只释放请求创建时记录的日/月预留，仍计入 60 秒防刷窗口；finalize、refund、recover 必须幂等且不得使 reserved_count 为负。
 - 保留旧原子预留、处理、成功确认、失败恢复、stale 恢复与 requestId 幂等 RPC，供历史数据兼容；新 Worker 只能使用 V2 RPC。
 - 保留输入长度限制、限流、严格 Schema 验证、Prompt Injection 数据边界和脱敏 Supabase 错误诊断。
 - 只有模型成功并通过 Schema 验证才确认成功；失败不得计入成功分析次数。

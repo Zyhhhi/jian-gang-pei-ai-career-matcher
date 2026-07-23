@@ -8,6 +8,9 @@ const MAX_TOTAL_CHARS = 20000;
 const MIN_RESUME_CHARS = 40;
 const MIN_JD_CHARS = 40;
 const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
+export const STALE_RECOVERY_TTL_MS = 5 * 60 * 1000;
+export const STALE_RECOVERY_SAFETY_MARGIN_MS = 60 * 1000;
+export const STALE_RECOVERY_BATCH_SIZE = 50;
 
 export const AI_OUTPUT_LIMITS = Object.freeze({
   arrays: Object.freeze({
@@ -64,8 +67,112 @@ export const PROMPT_OUTPUT_SHAPE = Object.freeze({
 export default {
   fetch(request, env) {
     return handleRequest(request, env, { fetchImpl: globalThis.fetch.bind(globalThis) });
+  },
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(recoverStalePlatformRequests(env, controller, {
+      fetchImpl: globalThis.fetch.bind(globalThis)
+    }));
   }
 };
+
+export function isStaleRecoveryTimingSafe(modelTimeoutMs) {
+  const timeout = Number(modelTimeoutMs);
+  return Number.isFinite(timeout)
+    && timeout >= 0
+    && STALE_RECOVERY_TTL_MS > timeout + STALE_RECOVERY_SAFETY_MARGIN_MS;
+}
+
+export async function recoverStalePlatformRequests(env, controller, dependencies = {}) {
+  const startedAt = Date.now();
+  const fetchImpl = dependencies.fetchImpl || globalThis.fetch.bind(globalThis);
+  const nowMs = typeof dependencies.nowMs === 'number' ? dependencies.nowMs : Date.now();
+  const modelTimeoutMs = configuredModelTimeoutMs(env?.MODEL_TIMEOUT_MS);
+  const summary = { scanned: 0, recovered: 0, skipped: 0, failed: 0 };
+
+  if (!isStaleRecoveryTimingSafe(modelTimeoutMs)) {
+    summary.failed = 1;
+    summary.errorCode = 'STALE_RECOVERY_TIMING_UNSAFE';
+    logStaleRecoverySummary(summary, startedAt);
+    return summary;
+  }
+
+  const staleBefore = new Date(nowMs - STALE_RECOVERY_TTL_MS).toISOString();
+  let candidates;
+  try {
+    candidates = await listStalePlatformRequests(env, staleBefore, fetchImpl);
+  } catch {
+    summary.failed = 1;
+    logStaleRecoverySummary(summary, startedAt);
+    return summary;
+  }
+
+  for (const candidate of candidates) {
+    summary.scanned += 1;
+    if (!isStaleRecoveryCandidate(candidate)) {
+      summary.skipped += 1;
+      continue;
+    }
+    try {
+      const recovery = firstRpcRow(await supabaseRest(env, '/rest/v1/rpc/recover_stale_platform_ai_request_v2', {
+        method: 'POST',
+        body: JSON.stringify({
+          p_request_id: candidate.request_id,
+          p_user_id: candidate.user_id
+        }),
+        suppressFailureLog: true
+      }, fetchImpl));
+      if (recovery?.outcome === 'refunded') {
+        summary.recovered += 1;
+      } else {
+        summary.skipped += 1;
+      }
+    } catch {
+      summary.failed += 1;
+    }
+  }
+
+  logStaleRecoverySummary(summary, startedAt);
+  return summary;
+}
+
+async function listStalePlatformRequests(env, staleBefore, fetchImpl) {
+  const path = [
+    '/rest/v1/ai_requests?',
+    'quota_policy=eq.daily_monthly_v2',
+    'status=in.(reserved,processing)',
+    `updated_at=lt.${encodeURIComponent(staleBefore)}`,
+    'select=request_id,user_id,status,updated_at',
+    'order=updated_at.asc',
+    `limit=${STALE_RECOVERY_BATCH_SIZE}`
+  ].join('&');
+  const rows = await supabaseRest(env, path, {}, fetchImpl);
+  return Array.isArray(rows) ? rows.slice(0, STALE_RECOVERY_BATCH_SIZE) : [];
+}
+
+function isStaleRecoveryCandidate(candidate) {
+  return Boolean(
+    candidate
+    && REQUEST_ID_PATTERN.test(String(candidate.request_id || ''))
+    && typeof candidate.user_id === 'string'
+    && ['reserved', 'processing'].includes(candidate.status)
+    && typeof candidate.updated_at === 'string'
+  );
+}
+
+function logStaleRecoverySummary(summary, startedAt) {
+  console.info('Platform AI stale recovery summary.', {
+    scanned: summary.scanned,
+    recovered: summary.recovered,
+    skipped: summary.skipped,
+    failed: summary.failed,
+    duration_ms: Date.now() - startedAt
+  });
+}
+
+function configuredModelTimeoutMs(value) {
+  const timeout = Number(value);
+  return Number.isFinite(timeout) ? timeout : DEFAULT_MODEL_TIMEOUT_MS;
+}
 
 export async function handleRequest(request, env, dependencies = {}) {
   const fetchImpl = dependencies.fetchImpl || globalThis.fetch.bind(globalThis);
@@ -443,7 +550,7 @@ async function supabaseRest(env, path, options, fetchImpl) {
   const text = await resp.text();
   if (!resp.ok) {
     const diagnostic = buildSupabaseFailureDiagnostic(path, resp.status, text);
-    console.error('Supabase request failed.', diagnostic);
+    if (!options.suppressFailureLog) console.error('Supabase request failed.', diagnostic);
     throw new AppError('SUPABASE_REQUEST_FAILED', 'Supabase request failed.', 503, {
       providerStatus: resp.status
     });
