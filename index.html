@@ -725,6 +725,75 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 }
 .capability-list strong { color: var(--ink); }
 .footer { margin-top: 42px; color: var(--muted); font-size: 13px; text-align: center; }
+/* v0.9.0 interaction shell: presentation only; business IDs and handlers remain unchanged. */
+.redesign-shell { display: grid; gap: 18px; min-height: calc(100vh - 118px); }
+.workflow-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 2px 0; }
+.quota-top { padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--green-soft); color: var(--green); white-space: nowrap; font-size: 13px; font-weight: 720; }
+.workflow-stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 7px; border: 1px solid var(--line); border-radius: 20px; background: rgba(255,255,255,.72); }
+.workflow-step { display: flex; align-items: center; gap: 10px; padding: 11px 13px; min-height: 52px; border: 0; border-radius: 14px; background: transparent; color: var(--muted); text-align: left; font-weight: 720; }
+.workflow-step:hover { background: rgba(245,245,247,.9); color: var(--ink); }
+.workflow-step[aria-current="step"] { background: var(--ink); color: #fff; box-shadow: 0 8px 22px rgba(29,29,31,.16); }
+.workflow-step b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: rgba(255,255,255,.15); font-size: 12px; }
+.workflow-step:not([aria-current="step"]) b { background: var(--surface-2); color: var(--text); }
+.app-view { display: none; min-height: min(650px, calc(100vh - 244px)); }
+.app-view.active { display: block; }
+.step-stage { height: 100%; display: grid; align-content: start; gap: 16px; }
+.step-stage[hidden] { display: none; }
+.stage-intro { display:flex; justify-content:space-between; gap:20px; align-items:flex-end; }
+.stage-intro h2 { margin: 0; font-size: 24px; }
+.stage-intro p { margin: 5px 0 0; color: var(--muted); }
+.stage-card { max-height: calc(100vh - 350px); overflow: auto; }
+.stage-card .panel { box-shadow: none; background: transparent; border: 0; padding: 0; }
+.stage-card .profile-panel { margin: 0; }
+.stage-card .job-method { background: rgba(255,255,255,.78); }
+.compact-summary { display: none; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); color: var(--green); font-size: 13px; }
+.compact-summary.visible { display: block; }
+.result-workspace { display: grid; gap: 14px; }
+.result-headline { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: center; padding: 22px; border-radius: 22px; background: linear-gradient(135deg,#1d1d1f,#38383e); color: white; }
+.result-headline .score { font-size: 58px; font-weight: 820; line-height: .9; letter-spacing: -.06em; }
+.result-headline strong { display: block; font-size: 20px; }
+.result-headline p { margin: 5px 0 0; color: rgba(255,255,255,.76); }
+.result-tabs { display:flex; gap:8px; overflow-x:auto; padding:4px 0; }
+.result-tab { flex:0 0 auto; border:1px solid var(--line); border-radius:999px; padding:9px 13px; background:#fff; color:var(--text); font-weight:720; }
+.result-tab.active { background:var(--ink); color:#fff; border-color:var(--ink); }
+.result-tab-panel { display:none; max-height:calc(100vh - 470px); overflow:auto; padding:2px 2px 18px; }
+.result-tab-panel.active { display:block; }
+.drawer-backdrop { display:none; position:fixed; inset:0; z-index:40; background:rgba(15,15,18,.34); }
+.drawer-backdrop.open { display:block; }
+.drawer { position:fixed; z-index:41; right:0; top:0; height:100dvh; width:min(680px, 92vw); padding:28px; overflow:auto; background:#fff; box-shadow:-22px 0 70px rgba(0,0,0,.16); transform:translateX(105%); transition:transform .22s ease; }
+.drawer.open { transform:translateX(0); }
+.drawer-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:22px; }
+.drawer-head h2 { margin:0; font-size:28px; letter-spacing:-.035em; }
+.drawer-close { border:1px solid var(--line); border-radius:999px; background:#fff; width:38px; height:38px; font-size:20px; }
+.explain-section { padding:18px 0; border-top:1px solid var(--line); }
+.explain-section:first-child { border-top:0; padding-top:0; }
+.explain-section h3 { margin:0 0 8px; font-size:17px; }
+.explain-section p,.explain-section li { color:var(--text); font-size:14px; }
+.explain-section ul { margin:8px 0 0; padding-left:20px; }
+.account-menu { position:relative; }
+.account-popover { display:none; position:absolute; right:0; top:calc(100% + 10px); width:220px; padding:8px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:var(--shadow); }
+.account-popover.open { display:grid; gap:4px; }
+.account-popover button { text-align:left; border:0; border-radius:10px; background:transparent; padding:10px; color:var(--text); }
+.account-popover button:hover { background:var(--surface-2); }
+.account-drawer .job-method,.account-drawer .panel { margin-bottom:16px; }
+.history-view { max-width:920px; margin:0 auto; }
+.history-view .panel { margin-bottom:16px; }
+.history-view .history-list { max-height:calc(50vh - 90px); overflow:auto; padding-right:4px; }
+.redesign-ready .hero, .redesign-ready #analyzer { display:none; }
+.redesign-ready .sidebar { position:static; }
+.mobile-step-label { display:none; }
+@media (max-width:900px) {
+  .workflow-head { padding-top:8px; }
+  .workflow-stepper { grid-template-columns:1fr; }
+  .workflow-step { display:none; }
+  .workflow-step[aria-current="step"] { display:flex; }
+  .mobile-step-label { display:inline; }
+  .stage-card { max-height:none; }
+  .app-view { min-height:auto; }
+  .result-tab-panel { max-height:none; }
+  .drawer { width:100vw; max-width:none; }
+  .quota-top { white-space:normal; }
+}
 @media (max-width: 900px) {
   .hero, .grid, .form-grid, .profile-summary, .manual-grid, .privacy-grid, .score-card, .result-grid, .ai-mode-grid, .quota-summary { grid-template-columns: 1fr; }
   .hero { min-height: auto; padding-top: 18px; }
@@ -745,11 +814,22 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
 <body>
 <main class="shell">
   <nav class="topbar">
-    <div class="brand"><span class="mark">简</span><span>简岗配 · RoleFit AI</span></div>
+    <div class="brand"><span class="mark">简</span><span>岗位匹配工具 · RoleFit AI</span></div>
     <div class="top-links">
-      <a class="ghost-link" href="#analyzer">开始分析</a>
-      <a class="ghost-link" href="#historyPanel">历史记录</a>
-      <a class="ghost-link" href="#resultPanel">分析结果</a>
+      <button class="ghost-link" type="button" onclick="openAppView('analysis', 1)">开始分析</button>
+      <button class="ghost-link" type="button" onclick="openAppView('history')">历史记录</button>
+      <button class="ghost-link" type="button" onclick="openDrawer('productDrawer')">产品说明</button>
+      <button class="ghost-link" type="button" onclick="openDrawer('noticeDrawer')">注意事项</button>
+      <span class="quota-top" id="topQuota">今日剩余额度：5 次</span>
+      <div class="account-menu">
+        <button class="ghost-link" id="accountMenuButton" type="button" aria-haspopup="menu" aria-expanded="false" onclick="toggleAccountMenu()">账户</button>
+        <div class="account-popover" id="accountPopover" role="menu">
+          <button type="button" onclick="openDrawer('accountDrawer')">登录与账户</button>
+          <button type="button" onclick="openDrawer('accountDrawer', 'apiKeyPanel')">自带 API Key</button>
+          <button type="button" onclick="openDrawer('accountDrawer', 'localDataPanel')">本地数据管理</button>
+          <button type="button" onclick="openDrawer('accountDrawer', 'siteFeedbackPanel')">意见反馈</button>
+        </div>
+      </div>
     </div>
   </nav>
 
@@ -781,6 +861,31 @@ textarea:focus, input:focus, select:focus { border-color: var(--line-strong); bo
       </ul>
     </aside>
   </section>
+
+  <section class="redesign-shell" id="appShell" aria-label="RoleFit AI 主工作区">
+    <header class="workflow-head">
+      <span class="eyebrow">求职分析工作台</span>
+      <button class="secondary-btn" type="button" data-example-button onclick="fillExample()" disabled>填入虚构示例</button>
+    </header>
+    <div class="workflow-stepper" role="tablist" aria-label="分析步骤">
+      <button class="workflow-step" id="workflowStep1" type="button" role="tab" onclick="openAppView('analysis', 1)"><b>1</b><span>添加简历 <em class="mobile-step-label">· 第 1 步 / 共 4 步</em></span></button>
+      <button class="workflow-step" id="workflowStep2" type="button" role="tab" onclick="openAppView('analysis', 2)"><b>2</b><span>添加岗位 JD <em class="mobile-step-label">· 第 2 步 / 共 4 步</em></span></button>
+      <button class="workflow-step" id="workflowStep3" type="button" role="tab" onclick="openAppView('analysis', 3)"><b>3</b><span>选择分析模式 <em class="mobile-step-label">· 第 3 步 / 共 4 步</em></span></button>
+      <button class="workflow-step" id="workflowStep4" type="button" role="tab" onclick="openAppView('analysis', 4)"><b>4</b><span>查看分析结果 <em class="mobile-step-label">· 第 4 步 / 共 4 步</em></span></button>
+    </div>
+    <section class="app-view active" id="analysisView">
+      <div class="step-stage" id="stepStage1"><div class="stage-intro"><div><h2>添加简历</h2><p>上传或粘贴后保存为本地简历档案。</p></div></div><div class="stage-card" id="stepResume"></div></div>
+      <div class="step-stage" id="stepStage2" hidden><div class="stage-intro"><div><h2>添加岗位 JD</h2><p>确认将用于分析的岗位描述与补充信息。</p></div></div><div class="stage-card" id="stepJd"></div></div>
+      <div class="step-stage" id="stepStage3" hidden><div class="stage-intro"><div><h2>选择分析方式</h2><p>选择一种模式后，只需点击一次开始分析。</p></div></div><div class="stage-card" id="stepMode"></div></div>
+      <div class="step-stage" id="stepStage4" hidden><div class="stage-intro"><div><h2>分析结果</h2><p>核心结论固定在顶部，详细内容在标签页内查看。</p></div></div><div class="result-workspace" id="resultWorkspace"></div></div>
+    </section>
+    <section class="app-view history-view" id="historyView" hidden aria-label="历史记录"></section>
+  </section>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawers()"></div>
+  <aside class="drawer" id="productDrawer" aria-hidden="true" aria-label="产品说明" tabindex="-1" inert><div class="drawer-head"><h2>产品说明</h2><button class="drawer-close" type="button" aria-label="关闭产品说明" onclick="closeDrawers()">×</button></div><div class="explain-section"><h3>项目背景与目标用户</h3><p>面向应届生和初级岗位求职者的本地优先求职分析工具，帮助用户在投递前更清楚地理解岗位要求、证据缺口与沟通准备。</p></div><div class="explain-section"><h3>用户痛点与核心方案</h3><p>将分散的简历、JD、关键词、面试准备和投递话术收敛为一次可复用的分析包：先确认输入，再生成匹配、优化与沟通材料。</p></div><div class="explain-section"><h3>产品功能架构</h3><p>简历档案、岗位 JD、三种分析模式、完整结果、历史记录与本地数据管理共同组成闭环。</p></div><div class="explain-section"><h3>AI 的作用与三种模式</h3><p>Mock 用于无登录体验；平台 AI 提供受额度与异常退款保护的服务端分析；自带 Key 由浏览器直连 DeepSeek，费用由用户账户承担。三者让体验、成本和隐私边界保持清晰。</p></div><div class="explain-section"><h3>配额、防刷与异常恢复</h3><p>平台 AI 仅成功分析计次，每日最多 5 次、每月最多 30 次，并受短时防刷限制。请求异常会退款；浏览器断线导致结果无法取回时，定时恢复机制会释放陈旧预留额度。</p></div><div class="explain-section"><h3>数据隔离与隐私设计</h3><p>登录用户与访客使用不同本地数据空间；自带 API Key 仅保存于当前浏览器。简历和 JD 只会在用户主动开始真实分析时按所选模式发送。</p></div><div class="explain-section"><h3>产品迭代、能力边界与后续方向</h3><p>当前已完成 Magic Link、账号隔离、完整结构校验、平台额度与异常恢复。浏览器中断后结果仍可能无法取回；Queue、202 异步任务与结果轮询是后续独立架构升级方向。</p></div><div class="explain-section"><h3>我的项目职责</h3><ul><li>独立完成用户场景分析、需求拆解和产品方案设计。</li><li>使用 GPT、Codex 等 AI 工具完成前端、后端代理和数据库能力落地。</li><li>设计登录、平台额度、自带 Key、数据隔离和异常恢复机制。</li><li>完成产品测试、部署和线上迭代。</li><li>通过真实可体验 MVP 验证完整产品流程。</li></ul></div></aside>
+  <aside class="drawer" id="noticeDrawer" aria-hidden="true" aria-label="注意事项" tabindex="-1" inert><div class="drawer-head"><h2>注意事项</h2><button class="drawer-close" type="button" aria-label="关闭注意事项" onclick="closeDrawers()">×</button></div><div class="explain-section"><ul><li>平台 AI 每日最多成功分析 5 次，每月最多成功分析 30 次。</li><li>只有成功分析才扣除平台额度。</li><li>选择平台 AI 或自带 Key 后，已确认的简历与 JD 会发送给对应模型处理。</li><li>不要上传身份证、银行卡、密码、API Key 等敏感信息。</li><li>自带 Key 仅保存在当前浏览器。</li><li>AI 输出仅供求职参考，不代表招聘结果。</li><li>浏览器中断时，结果可能无法取回；异常平台请求会自动释放额度。</li><li>支持 TXT、文字型 PDF、DOCX 简历本地解析；暂不支持扫描版 PDF、图片简历或 OCR。</li></ul></div></aside>
+  <aside class="drawer account-drawer" id="accountDrawer" aria-hidden="true" aria-label="账户与本地设置" tabindex="-1" inert><div class="drawer-head"><h2>账户与本地设置</h2><button class="drawer-close" type="button" aria-label="关闭账户与本地设置" onclick="closeDrawers()">×</button></div><div id="accountDrawerContent"></div></aside>
 
   <section class="grid" id="analyzer">
     <div>
@@ -1279,13 +1384,13 @@ const SUPABASE_AUTH_CONFIG = {
 };
 
 const RELEASE_CONFIG = Object.freeze({
-  VERSION: 'v0.8.6d',
+  VERSION: 'v0.9.0',
   MODE_SUMMARY: '未登录仅可使用本地演示；登录后可使用平台 AI 或自带 DeepSeek Key',
   UPDATED_AT: '2026-07-23'
 });
 
 const PLATFORM_AI_CONFIG = {
-  // Production Worker endpoint is wired, but platform AI remains disabled by default.
+  // Production Worker endpoint; the UI shell must not alter this protocol.
   PLATFORM_WORKER_BASE_URL: 'https://jian-gang-pei-platform-ai.sozowali642.workers.dev',
   PLATFORM_ANALYZE_PATH: '/api/platform-analyze',
   ENABLE_PLATFORM_AI: true
@@ -1728,6 +1833,7 @@ const exampleCases = [
 
 init();
 function init() {
+  initInteractionShell();
   localDataStore.beginAuthRestore();
   setExampleButtonsDisabled(true);
   localDataStore.migrateLegacySensitiveData();
@@ -1753,6 +1859,107 @@ function init() {
   renderAnalyticsDashboard();
   initAuthModule();
   updateCounts();
+}
+function initInteractionShell() {
+  const shell = $('appShell');
+  if (!shell || shell.dataset.ready === 'true') return;
+  shell.dataset.ready = 'true';
+  document.body.classList.add('redesign-ready');
+
+  const move = (node, target) => {
+    if (node && target) target.appendChild(node);
+  };
+  const resumePanel = $('resumeProfilePanel');
+  const jdPanel = analyzeHint?.closest('.panel');
+  const aiModePanel = $('aiModePanel');
+  const accountPanel = $('accountPanel');
+  const apiKeyPanel = $('apiKeyPanel');
+  const controls = analyzeBtn?.closest('.ops');
+
+  move(aiModePanel, $('stepMode'));
+  move(controls, $('stepMode'));
+  move(statusBox, $('stepMode'));
+  move(progressBox, $('stepMode'));
+  move(resumePanel, $('stepResume'));
+  move(jdPanel, $('stepJd'));
+  move(resultPanel, $('resultWorkspace'));
+  move($('historyPanel'), $('historyView'));
+  move($('jobRecordsPanel'), $('historyView'));
+  move(accountPanel, $('accountDrawerContent'));
+  move(apiKeyPanel, $('accountDrawerContent'));
+  move($('localDataPanel'), $('accountDrawerContent'));
+  move($('analyticsPanel'), $('accountDrawerContent'));
+  move($('siteFeedbackPanel'), $('accountDrawerContent'));
+
+  const privacyPanel = $('privacyPanel');
+  if (privacyPanel) $('noticeDrawer')?.appendChild(privacyPanel);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      closeDrawers();
+      closeAccountMenu();
+    }
+  });
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.account-menu')) closeAccountMenu();
+  });
+  document.addEventListener('click', event => {
+    const trigger = event.target.closest('button');
+    if (!trigger) return;
+    if (trigger.getAttribute('onclick')?.includes('saveResumeProfile')) {
+      window.setTimeout(() => { if (getResumeProfile()) openAppView('analysis', 2); }, 0);
+    }
+    if (trigger.id === 'confirmJdBtn') {
+      window.setTimeout(() => { if (getJobDraft().jdConfirmed) openAppView('analysis', 3); }, 0);
+    }
+  });
+  openAppView('analysis', 1);
+}
+function openAppView(view, step = 1) {
+  const analysisView = $('analysisView');
+  const historyView = $('historyView');
+  const isAnalysis = view === 'analysis';
+  if (analysisView) { analysisView.hidden = !isAnalysis; analysisView.classList.toggle('active', isAnalysis); }
+  if (historyView) { historyView.hidden = isAnalysis; historyView.classList.toggle('active', !isAnalysis); }
+  if (isAnalysis) {
+    for (let index = 1; index <= 4; index += 1) {
+      const stage = $(`stepStage${index}`);
+      const button = $(`workflowStep${index}`);
+      if (stage) stage.hidden = index !== step;
+      if (button) button.setAttribute('aria-current', index === step ? 'step' : 'false');
+    }
+  }
+  closeAccountMenu();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function toggleAccountMenu() {
+  const popover = $('accountPopover');
+  const button = $('accountMenuButton');
+  const next = !popover?.classList.contains('open');
+  popover?.classList.toggle('open', next);
+  button?.setAttribute('aria-expanded', next ? 'true' : 'false');
+}
+function closeAccountMenu() {
+  $('accountPopover')?.classList.remove('open');
+  $('accountMenuButton')?.setAttribute('aria-expanded', 'false');
+}
+function openDrawer(id, focusId = '') {
+  closeAccountMenu();
+  const drawer = $(id);
+  if (!drawer) return;
+  $('drawerBackdrop')?.classList.add('open');
+  drawer.classList.add('open');
+  drawer.inert = false;
+  drawer.setAttribute('aria-hidden', 'false');
+  if (focusId) window.setTimeout(() => $(focusId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+  window.setTimeout(() => drawer.querySelector('button, input, textarea, select, [tabindex]')?.focus(), 0);
+}
+function closeDrawers() {
+  $('drawerBackdrop')?.classList.remove('open');
+  document.querySelectorAll('.drawer.open').forEach(drawer => {
+    drawer.classList.remove('open');
+    drawer.inert = true;
+    drawer.setAttribute('aria-hidden', 'true');
+  });
 }
 function renderReleaseInfo() {
   const footer = $('releaseFooter');
@@ -4765,59 +4972,36 @@ function renderResult(result) {
   const missingCount = result.keywordAnalysis.missing.length;
   const weaknessCount = result.resumeWeaknesses.length;
   resultContent.innerHTML = `
-    <div class="score-card">
-      <div>
-        <div class="score-num">${result.matchScore}</div>
-        <div>岗位匹配度 / 100</div>
-      </div>
-      <div>
-        <span class="badge">${escapeHtml(result.matchLevel)} · ${escapeHtml(result.applyRecommendation)}</span>
-        <h2>${escapeHtml(result.jobTitle)}</h2>
-        <p>${escapeHtml(result.summary)}</p>
-        <div class="score-meta">
-          <div><strong>${escapeHtml(result.companyName || '未填写')}</strong><span>公司名</span></div>
-          <div><strong>${escapeHtml(result.city || '未填写')}</strong><span>城市</span></div>
-          <div><strong>${weaknessCount}</strong><span>主要短板</span></div>
-          <div><strong>${missingCount}</strong><span>缺失关键词</span></div>
-        </div>
-      </div>
-    </div>
+    <div class="result-headline"><div><div class="score">${result.matchScore}</div><small>岗位匹配度 / 100</small></div><div><strong>${escapeHtml(result.jobTitle)}</strong><span class="badge">${escapeHtml(result.matchLevel)} · ${escapeHtml(result.applyRecommendation)}</span><p>${escapeHtml(result.summary)}</p></div></div>
     <div class="ops">
       <button class="primary-btn" type="button" onclick="saveCurrentJobRecord()">保存到求职记录</button>
       <button class="secondary-btn" type="button" onclick="copyMarkdown()">复制完整分析包</button>
       <button class="secondary-btn" type="button" onclick="downloadMarkdown()">导出 Markdown</button>
       <button class="plain-btn" type="button" onclick="runAnalyze()">重新生成</button>
     </div>
-    <div class="result-grid">
-      ${renderTrustedAnalysis(result.trustDetails)}
-      ${renderJdBreakdown(result.jdBreakdown)}
-      ${renderCard('简历匹配点', result.resumeMatches)}
-      ${renderCard('简历短板', result.resumeWeaknesses)}
-      ${renderKeywordCard(result.keywordAnalysis)}
-      ${renderOptimizationCard(result.optimizationSuggestions)}
-      ${renderRewriteCard(result.resumeRewrite)}
-      ${renderOutreachCard(result.outreachScripts)}
-      ${renderInterviewCard(result.interviewPrep)}
-      ${renderCopyCard('自我介绍建议（60 秒）', result.selfIntroduction, 'selfIntroduction')}
-      ${renderCard('反问问题', result.reverseQuestions, 'list', true)}
+    <div class="result-tabs" role="tablist" aria-label="分析结果分类">
+      <button class="result-tab active" type="button" role="tab" aria-selected="true" onclick="selectResultTab('overview', this)">匹配总览</button>
+      <button class="result-tab" type="button" role="tab" aria-selected="false" onclick="selectResultTab('resume', this)">简历优化</button>
+      <button class="result-tab" type="button" role="tab" aria-selected="false" onclick="selectResultTab('interview', this)">面试准备</button>
+      <button class="result-tab" type="button" role="tab" aria-selected="false" onclick="selectResultTab('materials', this)">求职材料</button>
     </div>
-    <div class="notice">
-      以上内容仅用于求职准备参考，不代表招聘结果，不保证面试或录用。请结合岗位真实要求、个人经历和 HR 沟通结果进行判断。
-    </div>
-    <div class="feedback-box">
-      <h3>结果反馈</h3>
-      <p class="hint">这个入口用于后续 Beta 化反馈收集，目前先保存到当前浏览器。反馈不会上传到服务器。</p>
-      <div class="feedback-options">
-        <button type="button" onclick="selectFeedback('有帮助', this)">有帮助</button>
-        <button type="button" onclick="selectFeedback('一般', this)">一般</button>
-        <button type="button" onclick="selectFeedback('不准确', this)">不准确</button>
-      </div>
-      <input id="feedbackText" placeholder="可选：用一句话说明哪里有帮助或哪里不准确">
-      <div class="ops"><button class="primary-btn" type="button" onclick="submitFeedback()">提交反馈</button></div>
-    </div>
+    <section class="result-tab-panel active" data-result-tab="overview">${renderTrustedAnalysis(result.trustDetails)}<div class="result-grid">${renderJdBreakdown(result.jdBreakdown)}${renderCard('简历匹配点', result.resumeMatches)}${renderCard('简历短板', result.resumeWeaknesses)}${renderKeywordCard(result.keywordAnalysis)}</div></section>
+    <section class="result-tab-panel" data-result-tab="resume"><div class="result-grid">${renderOptimizationCard(result.optimizationSuggestions)}${renderRewriteCard(result.resumeRewrite)}</div></section>
+    <section class="result-tab-panel" data-result-tab="interview"><div class="result-grid">${renderInterviewCard(result.interviewPrep)}${renderCopyCard('自我介绍建议（60 秒）', result.selfIntroduction, 'selfIntroduction')}${renderCard('反问问题', result.reverseQuestions, 'list', true)}</div></section>
+    <section class="result-tab-panel" data-result-tab="materials"><div class="result-grid">${renderOutreachCard(result.outreachScripts)}</div></section>
+    <div class="notice">以上内容仅用于求职准备参考，不代表招聘结果，不保证面试或录用。请结合岗位真实要求、个人经历和 HR 沟通结果进行判断。</div>
+    <div class="feedback-box"><h3>结果反馈</h3><p class="hint">反馈仅保存在当前浏览器。</p><div class="feedback-options"><button type="button" onclick="selectFeedback('有帮助', this)">有帮助</button><button type="button" onclick="selectFeedback('一般', this)">一般</button><button type="button" onclick="selectFeedback('不准确', this)">不准确</button></div><input id="feedbackText" placeholder="可选：用一句话说明哪里有帮助或哪里不准确"><div class="ops"><button class="primary-btn" type="button" onclick="submitFeedback()">提交反馈</button></div></div>
   `;
   resultPanel.classList.add('visible');
-  resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  openAppView('analysis', 4);
+}
+function selectResultTab(name, button) {
+  resultContent?.querySelectorAll('.result-tab').forEach(tab => {
+    const active = tab === button;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  resultContent?.querySelectorAll('[data-result-tab]').forEach(panel => panel.classList.toggle('active', panel.dataset.resultTab === name));
 }
 function renderTrustedAnalysis(trust) {
   if (!trust) return '';

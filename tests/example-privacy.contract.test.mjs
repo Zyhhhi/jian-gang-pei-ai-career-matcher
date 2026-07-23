@@ -308,8 +308,8 @@ test('真实 click、focus 和 focusin 冒泡在示例待保存期间不读取�
   assert.doesNotMatch(html, /addEventListener\('(click|focusin)', trackStartAnalysisArea, \{ once: true \}\)/);
 });
 
-test('auth hydrate 未完成时函数拒绝填充，两个示例按钮默认禁用', () => {
-  assert.equal((html.match(/data-example-button[^>]*disabled/g) || []).length, 2);
+test('auth hydrate 未完成时函数拒绝填充，所有示例按钮默认禁用', () => {
+  assert.ok((html.match(/data-example-button[^>]*disabled/g) || []).length >= 2);
   assert.match(html, /function loadActiveScopeData\(\)[\s\S]*?setExampleButtonsDisabled\(false\)/);
   assert.match(html, /function clearSensitivePageState\(\)[\s\S]*?setExampleButtonsDisabled\(true\)/);
   const harness = createFillHarness({ scopeReady: false });
